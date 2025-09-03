@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Geography Challenge</title>
+    <title>Airport Geography Challenge</title>
     
     <!-- Tailwind CSS for styling -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -18,76 +18,49 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700;800&display=swap" rel="stylesheet">
 
     <style>
-        /* Custom styles to complement Tailwind */
-        body {
-            font-family: 'Inter', sans-serif;
-            touch-action: none;
-        }
-        #map {
-            height: 100vh;
-            width: 100vw;
-            z-index: 10;
-            background-color: #a2d1f7; /* Water blue color */
-        }
-        .correct-answer-icon {
-            background-color: #4f008c;
-            border: 2px solid white;
-            border-radius: 50%;
-            box-shadow: 0 0 10px rgba(0,0,0,0.5);
-        }
-        .user-guess-icon {
-            background-color: #f5a623;
-            border: 2px solid white;
-            border-radius: 50%;
-            box-shadow: 0 0 10px rgba(0,0,0,0.5);
-        }
-        /* Ensure overlays cover the screen */
-        .screen-overlay {
-            position: absolute;
-            inset: 0;
-            background-color: rgba(0,0,0,0.7);
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-            align-items: center;
-            text-align: center;
-            color: white;
-            padding: 2rem;
-            z-index: 30;
-        }
-        .mastery-star {
-            color: #FFD700; /* Gold color for stars */
-            text-shadow: 0 0 2px black;
-        }
-        .mastery-star-empty {
-            color: #a0a0a0;
-        }
+        body { font-family: 'Inter', sans-serif; touch-action: none; }
+        #map { height: 100vh; width: 100vw; z-index: 10; background-color: #a2d1f7; }
+        .correct-answer-icon { background-color: #4f008c; border: 2px solid white; border-radius: 50%; box-shadow: 0 0 10px rgba(0,0,0,0.5); }
+        .user-guess-icon { background-color: #f5a623; border: 2px solid white; border-radius: 50%; box-shadow: 0 0 10px rgba(0,0,0,0.5); }
+        .screen-overlay { position: absolute; inset: 0; background-color: rgba(0,0,0,0.8); display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; color: white; padding: 2rem; z-index: 30; }
+        .mastery-star { color: #FFD700; text-shadow: 0 0 2px black; }
+        .mastery-star-empty { color: #a0a0a0; }
+        .leaflet-popup-content-wrapper { background-color: #2d3748; color: white; border-radius: 8px; }
+        .leaflet-popup-content { margin: 13px 19px; line-height: 1.4; }
+        .leaflet-popup-tip { background: #2d3748; }
+        .leaflet-marker-icon.practice-marker { background-color: rgba(79, 0, 140, 0.7); border: 2px solid white; border-radius: 50%; }
     </style>
 </head>
 <body class="bg-gray-100 overflow-hidden">
 
-    <!-- Main Game Container -->
     <div id="game-container" class="relative w-screen h-screen">
-        
         <div id="map"></div>
 
-        <!-- Quiz Start Screen Overlay -->
-        <div id="quiz-start-screen" class="screen-overlay">
-            <h1 id="quiz-title" class="text-4xl md:text-6xl font-extrabold mb-4 text-purple-300">Thai Airways Route Challenge</h1>
-            <p id="quiz-description" class="text-lg md:text-xl mb-8 max-w-2xl">Find the destination on the world map.</p>
-            <div id="progress-summary" class="mb-8 text-lg bg-black/30 p-4 rounded-lg">
-                <p>Mastered: <span id="mastered-count">0</span> / 63</p>
-            </div>
-            <div class="flex flex-col sm:flex-row gap-4">
-                <button id="start-quiz-button" class="bg-purple-600 hover:bg-purple-700 text-white font-bold py-3 px-8 rounded-lg text-xl shadow-lg transition-transform transform hover:scale-105">
-                    Start Quiz
-                </button>
-            </div>
+        <div id="loading-screen" class="screen-overlay">
+            <h1 class="text-4xl font-bold">Connecting...</h1>
         </div>
 
-        <!-- Game UI Overlay -->
+        <div id="home-screen" class="screen-overlay hidden">
+            <h1 class="text-4xl md:text-6xl font-extrabold mb-4 text-purple-300">Airport Challenge</h1>
+            <p class="text-lg md:text-xl mb-6 max-w-2xl">Prepare for your captain interview by mastering the Thai Airways routes.</p>
+            <div id="progress-summary" class="mb-4 text-lg bg-black/30 p-4 rounded-lg">
+                <p>Mastered: <span id="mastered-count">0</span> / 63</p>
+            </div>
+             <div class="mb-8 text-xs bg-black/30 p-2 rounded-lg">
+                <p>User ID: <span id="user-id-display"></span></p>
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                 <button data-mode="practice" class="mode-select-button bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-6 rounded-lg text-xl shadow-lg transition-transform transform hover:scale-105">Practice Mode</button>
+                 <button data-mode="guessLocationName" class="mode-select-button bg-purple-600 hover:bg-purple-700 text-white font-bold py-3 px-6 rounded-lg text-xl shadow-lg transition-transform transform hover:scale-105">Guess Location by Name</button>
+                 <button data-mode="guessLocationCode" class="mode-select-button bg-teal-600 hover:bg-teal-700 text-white font-bold py-3 px-6 rounded-lg text-xl shadow-lg transition-transform transform hover:scale-105">Guess Location by Code</button>
+            </div>
+        </div>
+        
         <div id="game-ui" class="absolute top-0 left-0 w-full p-4 md:p-6 z-20 hidden pointer-events-none">
             <div class="max-w-7xl mx-auto flex justify-between items-center bg-white/80 backdrop-blur-sm p-4 rounded-xl shadow-lg pointer-events-auto">
+                <button id="back-to-home-from-game" class="bg-gray-400 hover:bg-gray-500 text-white font-bold p-2 rounded-full mr-4">
+                     <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1V10a1 1 0 00-1-1H7a1 1 0 00-1 1v10a1 1 0 001 1h2z" /></svg>
+                </button>
                 <div class="flex-1">
                     <p class="text-sm font-medium text-gray-500">Find this destination:</p>
                     <div class="flex items-center gap-2">
@@ -124,6 +97,9 @@
                 <button id="restart-button" class="bg-purple-600 hover:bg-purple-700 text-white font-bold py-3 px-8 rounded-lg text-xl shadow-lg transition-transform transform hover:scale-105">
                     Play Again
                 </button>
+                 <button id="home-button-from-end" class="bg-gray-500 hover:bg-gray-600 text-white font-bold py-3 px-8 rounded-lg text-xl shadow-lg transition-transform transform hover:scale-105">
+                    Home
+                </button>
                 <button id="reset-progress-button" class="bg-red-600 hover:bg-red-700 text-white font-bold py-3 px-8 rounded-lg text-xl shadow-lg transition-transform transform hover:scale-105">
                     Reset Progress
                 </button>
@@ -131,19 +107,27 @@
         </div>
     </div>
 
-    <script>
-        // --- DATASETS ---
+    <script type="module">
+        // Firebase Imports
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, doc, onSnapshot, setDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // --- DATASET ---
         const airwaysDestinations = [
-            { city: "Chiang Mai", country: "Thailand", lat: 18.7669, lon: 98.9626 }, { city: "Chiang Rai", country: "Thailand", lat: 19.9546, lon: 99.8828 }, { city: "Khon Kaen", country: "Thailand", lat: 16.4673, lon: 102.7852 }, { city: "Udon Thani", country: "Thailand", lat: 17.3871, lon: 102.8122 }, { city: "Ubon Ratchathani", country: "Thailand", lat: 15.2508, lon: 104.8690 }, { city: "Krabi", country: "Thailand", lat: 8.0945, lon: 98.9877 }, { city: "Hat Yai", country: "Thailand", lat: 6.9328, lon: 100.3950 }, { city: "Phuket", country: "Thailand", lat: 8.1132, lon: 98.3168 }, { city: "Ahmedabad", country: "India", lat: 23.0734, lon: 72.6347 }, { city: "Beijing", country: "China", lat: 40.0801, lon: 116.5845 }, { city: "Bengaluru", country: "India", lat: 13.1986, lon: 77.7063 }, { city: "Chennai", country: "India", lat: 12.9941, lon: 80.1709 }, { city: "Chengdu", country: "China", lat: 30.5785, lon: 103.9485 }, { city: "Colombo", country: "Sri Lanka", lat: 7.1802, lon: 79.8842 }, { city: "Dhaka", country: "Bangladesh", lat: 23.8433, lon: 90.3978 }, { city: "Delhi", country: "India", lat: 28.5562, lon: 77.1000 }, { city: "Denpasar", country: "Indonesia", lat: -8.7482, lon: 115.1672 }, { city: "Fukuoka", country: "Japan", lat: 33.5858, lon: 130.4505 }, { city: "Guangzhou", country: "China", lat: 23.3924, lon: 113.2988 }, { city: "Hanoi", country: "Vietnam", lat: 21.2212, lon: 105.8072 }, { city: "Ho Chi Minh City", country: "Vietnam", lat: 10.8222, lon: 106.6619 }, { city: "Hong Kong", country: "Hong Kong", lat: 22.3080, lon: 113.9185 }, { city: "Hyderabad", country: "India", lat: 17.2403, lon: 78.4294 }, { city: "Islamabad", country: "Pakistan", lat: 33.5492, lon: 72.8256 }, { city: "Jakarta", country: "Indonesia", lat: -6.1256, lon: 106.6558 }, { city: "Karachi", country: "Pakistan", lat: 24.9073, lon: 67.1608 }, { city: "Kathmandu", country: "Nepal", lat: 27.6966, lon: 85.3591 }, { city: "Kaohsiung", country: "Taiwan", lat: 22.5768, lon: 120.3499 }, { city: "Kochi", country: "India", lat: 10.1520, lon: 76.4019 }, { city: "Kolkata", country: "India", lat: 22.6547, lon: 88.4467 }, { city: "Kuala Lumpur", country: "Malaysia", lat: 2.7456, lon: 101.7099 }, { city: "Kunming", country: "China", lat: 25.1019, lon: 102.928 }, { city: "Lahore", country: "Pakistan", lat: 31.5216, lon: 74.4036 }, { city: "Manila", country: "Philippines", lat: 14.5086, lon: 121.0194 }, { city: "Mumbai", country: "India", lat: 19.0896, lon: 72.8656 }, { city: "Nagoya", country: "Japan", lat: 34.8584, lon: 136.8054 }, { city: "Osaka", country: "Japan", lat: 34.4272, lon: 135.2442 }, { city: "Penang", country: "Malaysia", lat: 5.2971, lon: 100.2766 }, { city: "Phnom Penh", country: "Cambodia", lat: 11.5466, lon: 104.8441 }, { city: "Sapporo", country: "Japan", lat: 42.7752, lon: 141.6923 }, { city: "Seoul", country: "South Korea", lat: 37.4602, lon: 126.4407 }, { city: "Shanghai", country: "China", lat: 31.1444, lon: 121.8053 }, { city: "Siem Reap", country: "Cambodia", lat: 13.4107, lon: 103.8121 }, { city: "Singapore", country: "Singapore", lat: 1.3644, lon: 103.9915 }, { city: "Taipei", country: "Taiwan", lat: 25.0797, lon: 121.2345 }, { city: "Tokyo (Haneda)", country: "Japan", lat: 35.5494, lon: 139.7798 }, { city: "Tokyo (Narita)", country: "Japan", lat: 35.7720, lon: 140.3863 }, { city: "Vientiane", country: "Laos", lat: 17.9883, lon: 102.5633 }, { city: "Yangon", country: "Myanmar", lat: 16.9073, lon: 96.1332 }, { city: "Brussels", country: "Belgium", lat: 50.9014, lon: 4.4844 }, { city: "Copenhagen", country: "Denmark", lat: 55.6180, lon: 12.6560 }, { city: "Frankfurt", country: "Germany", lat: 50.0379, lon: 8.5622 }, { city: "Istanbul", country: "Turkey", lat: 41.2753, lon: 28.7519 }, { city: "London", country: "United Kingdom", lat: 51.4700, lon: -0.4543 }, { city: "Melbourne", country: "Australia", lat: -37.6690, lon: 144.8410 }, { city: "Milan", country: "Italy", lat: 45.6301, lon: 8.7285 }, { city: "Munich", country: "Germany", lat: 48.3537, lon: 11.7861 }, { city: "Oslo", country: "Norway", lat: 60.1976, lon: 11.1004 }, { city: "Paris", country: "France", lat: 49.0097, lon: 2.5479 }, { city: "Perth", country: "Australia", lat: -31.9403, lon: 115.9672 }, { city: "Stockholm", country: "Sweden", lat: 59.6498, lon: 17.9238 }, { city: "Sydney", country: "Australia", lat: -33.9399, lon: 151.1753 }, { city: "Zurich", country: "Switzerland", lat: 47.4647, lon: 8.5492 }
+            { city: "Chiang Mai", country: "Thailand", iata: "CNX", icao: "VTCC", lat: 18.7669, lon: 98.9626 }, { city: "Chiang Rai", country: "Thailand", iata: "CEI", icao: "VTCT", lat: 19.9546, lon: 99.8828 }, { city: "Khon Kaen", country: "Thailand", iata: "KKC", icao: "VTUK", lat: 16.4673, lon: 102.7852 }, { city: "Udon Thani", country: "Thailand", iata: "UTH", icao: "VTUD", lat: 17.3871, lon: 102.8122 }, { city: "Ubon Ratchathani", country: "Thailand", iata: "UBP", icao: "VTUU", lat: 15.2508, lon: 104.8690 }, { city: "Krabi", country: "Thailand", iata: "KBV", icao: "VTSG", lat: 8.0945, lon: 98.9877 }, { city: "Hat Yai", country: "Thailand", iata: "HDY", icao: "VTSS", lat: 6.9328, lon: 100.3950 }, { city: "Phuket", country: "Thailand", iata: "HKT", icao: "VTSP", lat: 8.1132, lon: 98.3168 }, { city: "Ahmedabad", country: "India", iata: "AMD", icao: "VAAH", lat: 23.0734, lon: 72.6347 }, { city: "Beijing", country: "China", iata: "PEK", icao: "ZBAA", lat: 40.0801, lon: 116.5845 }, { city: "Bengaluru", country: "India", iata: "BLR", icao: "VOBL", lat: 13.1986, lon: 77.7063 }, { city: "Chennai", country: "India", iata: "MAA", icao: "VOMM", lat: 12.9941, lon: 80.1709 }, { city: "Chengdu", country: "China", iata: "CTU", icao: "ZUUU", lat: 30.5785, lon: 103.9485 }, { city: "Colombo", country: "Sri Lanka", iata: "CMB", icao: "VCBI", lat: 7.1802, lon: 79.8842 }, { city: "Dhaka", country: "Bangladesh", iata: "DAC", icao: "VGHS", lat: 23.8433, lon: 90.3978 }, { city: "Delhi", country: "India", iata: "DEL", icao: "VIDP", lat: 28.5562, lon: 77.1000 }, { city: "Denpasar", country: "Indonesia", iata: "DPS", icao: "WADD", lat: -8.7482, lon: 115.1672 }, { city: "Fukuoka", country: "Japan", iata: "FUK", icao: "RJFF", lat: 33.5858, lon: 130.4505 }, { city: "Guangzhou", country: "China", iata: "CAN", icao: "ZGGG", lat: 23.3924, lon: 113.2988 }, { city: "Hanoi", country: "Vietnam", iata: "HAN", icao: "VVNB", lat: 21.2212, lon: 105.8072 }, { city: "Ho Chi Minh City", country: "Vietnam", iata: "SGN", icao: "VVTS", lat: 10.8222, lon: 106.6619 }, { city: "Hong Kong", country: "Hong Kong", iata: "HKG", icao: "VHHH", lat: 22.3080, lon: 113.9185 }, { city: "Hyderabad", country: "India", iata: "HYD", icao: "VOHS", lat: 17.2403, lon: 78.4294 }, { city: "Islamabad", country: "Pakistan", iata: "ISB", icao: "OPIS", lat: 33.5492, lon: 72.8256 }, { city: "Jakarta", country: "Indonesia", iata: "CGK", icao: "WIII", lat: -6.1256, lon: 106.6558 }, { city: "Karachi", country: "Pakistan", iata: "KHI", icao: "OPKC", lat: 24.9073, lon: 67.1608 }, { city: "Kathmandu", country: "Nepal", iata: "KTM", icao: "VNKT", lat: 27.6966, lon: 85.3591 }, { city: "Kaohsiung", country: "Taiwan", iata: "KHH", icao: "RCKH", lat: 22.5768, lon: 120.3499 }, { city: "Kochi", country: "India", iata: "COK", icao: "VOCI", lat: 10.1520, lon: 76.4019 }, { city: "Kolkata", country: "India", iata: "CCU", icao: "VECC", lat: 22.6547, lon: 88.4467 }, { city: "Kuala Lumpur", country: "Malaysia", iata: "KUL", icao: "WMKK", lat: 2.7456, lon: 101.7099 }, { city: "Kunming", country: "China", iata: "KMG", icao: "ZPPP", lat: 25.1019, lon: 102.928 }, { city: "Lahore", country: "Pakistan", iata: "LHE", icao: "OPLA", lat: 31.5216, lon: 74.4036 }, { city: "Manila", country: "Philippines", iata: "MNL", icao: "RPLL", lat: 14.5086, lon: 121.0194 }, { city: "Mumbai", country: "India", iata: "BOM", icao: "VABB", lat: 19.0896, lon: 72.8656 }, { city: "Nagoya", country: "Japan", iata: "NGO", icao: "RJGG", lat: 34.8584, lon: 136.8054 }, { city: "Osaka", country: "Japan", iata: "KIX", icao: "RJBB", lat: 34.4272, lon: 135.2442 }, { city: "Penang", country: "Malaysia", iata: "PEN", icao: "WMKP", lat: 5.2971, lon: 100.2766 }, { city: "Phnom Penh", country: "Cambodia", iata: "PNH", icao: "VDPP", lat: 11.5466, lon: 104.8441 }, { city: "Sapporo", country: "Japan", iata: "CTS", icao: "RJCC", lat: 42.7752, lon: 141.6923 }, { city: "Seoul", country: "South Korea", iata: "ICN", icao: "RKSI", lat: 37.4602, lon: 126.4407 }, { city: "Shanghai", country: "China", iata: "PVG", icao: "ZSPD", lat: 31.1444, lon: 121.8053 }, { city: "Siem Reap", country: "Cambodia", iata: "REP", icao: "VDSR", lat: 13.4107, lon: 103.8121 }, { city: "Singapore", country: "Singapore", iata: "SIN", icao: "WSSS", lat: 1.3644, lon: 103.9915 }, { city: "Taipei", country: "Taiwan", iata: "TPE", icao: "RCTP", lat: 25.0797, lon: 121.2345 }, { city: "Tokyo (Haneda)", country: "Japan", iata: "HND", icao: "RJTT", lat: 35.5494, lon: 139.7798 }, { city: "Tokyo (Narita)", country: "Japan", iata: "NRT", icao: "RJAA", lat: 35.7720, lon: 140.3863 }, { city: "Vientiane", country: "Laos", iata: "VTE", icao: "VLVT", lat: 17.9883, lon: 102.5633 }, { city: "Yangon", country: "Myanmar", iata: "RGN", icao: "VYYY", lat: 16.9073, lon: 96.1332 }, { city: "Brussels", country: "Belgium", iata: "BRU", icao: "EBBR", lat: 50.9014, lon: 4.4844 }, { city: "Copenhagen", country: "Denmark", iata: "CPH", icao: "EKCH", lat: 55.6180, lon: 12.6560 }, { city: "Frankfurt", country: "Germany", iata: "FRA", icao: "EDDF", lat: 50.0379, lon: 8.5622 }, { city: "Istanbul", country: "Turkey", iata: "IST", icao: "LTFM", lat: 41.2753, lon: 28.7519 }, { city: "London", country: "United Kingdom", iata: "LHR", icao: "EGLL", lat: 51.4700, lon: -0.4543 }, { city: "Melbourne", country: "Australia", iata: "MEL", icao: "YMML", lat: -37.6690, lon: 144.8410 }, { city: "Milan", country: "Italy", iata: "MXP", icao: "LIMC", lat: 45.6301, lon: 8.7285 }, { city: "Munich", country: "Germany", iata: "MUC", icao: "EDDM", lat: 48.3537, lon: 11.7861 }, { city: "Oslo", country: "Norway", iata: "OSL", icao: "ENGM", lat: 60.1976, lon: 11.1004 }, { city: "Paris", country: "France", iata: "CDG", icao: "LFPG", lat: 49.0097, lon: 2.5479 }, { city: "Perth", country: "Australia", iata: "PER", icao: "YPPH", lat: -31.9403, lon: 115.9672 }, { city: "Stockholm", country: "Sweden", iata: "ARN", icao: "ESSA", lat: 59.6498, lon: 17.9238 }, { city: "Sydney", country: "Australia", iata: "SYD", icao: "YSSY", lat: -33.9399, lon: 151.1753 }, { city: "Zurich", country: "Switzerland", iata: "ZRH", icao: "LSZH", lat: 47.4647, lon: 8.5492 }
         ];
 
         // --- DOM Elements ---
-        const quizStartScreen = document.getElementById('quiz-start-screen');
+        const loadingScreen = document.getElementById('loading-screen');
+        const homeScreen = document.getElementById('home-screen');
         const endScreen = document.getElementById('end-screen');
         const gameUI = document.getElementById('game-ui');
-        const startQuizButton = document.getElementById('start-quiz-button');
+        const modeSelectButtons = document.querySelectorAll('.mode-select-button');
         const restartButton = document.getElementById('restart-button');
         const resetProgressButton = document.getElementById('reset-progress-button');
+        const backToHomeFromGameButton = document.getElementById('back-to-home-from-game');
+        const homeButtonFromEnd = document.getElementById('home-button-from-end');
         const destinationPrompt = document.getElementById('destination-prompt');
         const questionCounter = document.getElementById('question-counter');
         const scoreCounter = document.getElementById('score-counter');
@@ -154,6 +138,7 @@
         const nextButton = document.getElementById('next-button');
         const masteryDisplay = document.getElementById('mastery-display');
         const masteredCount = document.getElementById('mastered-count');
+        const userIdDisplay = document.getElementById('user-id-display');
         
         // --- Game State ---
         let map;
@@ -164,35 +149,57 @@
         let guessMarker = null;
         let answerMarker = null;
         let lineToAnswer = null;
+        let practiceMarkers = [];
         let destinationProgress = {};
+        let activeGameMode = null;
+        
+        // --- Firebase State ---
+        let auth, db, app;
+        let userId;
+        let progressUnsubscribe;
 
         // --- Progress Tracking ---
-        function loadProgress() {
-            const savedProgress = localStorage.getItem('thaiAirwaysProgress');
-            if (savedProgress) {
-                destinationProgress = JSON.parse(savedProgress);
-            } else {
-                // Initialize progress for all destinations if none is saved
-                airwaysDestinations.forEach(dest => {
-                    destinationProgress[dest.city] = 0;
-                });
+        function loadProgress(uid) {
+            userId = uid;
+            const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+            const progressDocRef = doc(db, 'artifacts', appId, 'users', userId);
+
+            if (progressUnsubscribe) progressUnsubscribe();
+
+            progressUnsubscribe = onSnapshot(progressDocRef, (docSnap) => {
+                if (docSnap.exists()) {
+                    destinationProgress = docSnap.data().progress || {};
+                } else {
+                    airwaysDestinations.forEach(dest => {
+                        destinationProgress[dest.city] = 0;
+                    });
+                    saveProgress(); 
+                }
+                updateProgressSummary();
+                loadingScreen.classList.add('hidden');
+                showHomeScreen();
+            });
+        }
+
+        async function saveProgress() {
+            if (!userId) return;
+            const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+            const progressDocRef = doc(db, 'artifacts', appId, 'users', userId);
+            try {
+                await setDoc(progressDocRef, { progress: destinationProgress }, { merge: true });
+            } catch (error) {
+                console.error("Error saving progress: ", error);
             }
-            updateProgressSummary();
         }
 
-        function saveProgress() {
-            localStorage.setItem('thaiAirwaysProgress', JSON.stringify(destinationProgress));
-            updateProgressSummary();
-        }
-
-        function resetProgress() {
+        async function resetProgress() {
             if (confirm("Are you sure you want to reset all your progress? This cannot be undone.")) {
                 airwaysDestinations.forEach(dest => {
                     destinationProgress[dest.city] = 0;
                 });
-                saveProgress();
+                await saveProgress();
                 endScreen.classList.add('hidden');
-                quizStartScreen.classList.remove('hidden');
+                showHomeScreen();
             }
         }
 
@@ -203,14 +210,13 @@
 
         function getMasteryStars(city) {
             const level = destinationProgress[city] || 0;
-            if (level >= 3) return '<span class="mastery-star">★★★</span>'; // Mastered
-            if (level === 2) return '<span class="mastery-star">★★</span><span class="mastery-star-empty">☆</span>'; // Familiar
-            if (level === 1) return '<span class="mastery-star">★</span><span class="mastery-star-empty">☆☆</span>'; // Learning
-            return '<span class="mastery-star-empty">☆☆☆</span>'; // Unseen
+            if (level >= 3) return '<span class="mastery-star">★★★</span>';
+            if (level === 2) return '<span class="mastery-star">★★</span><span class="mastery-star-empty">☆</span>';
+            if (level === 1) return '<span class="mastery-star">★</span><span class="mastery-star-empty">☆☆</span>';
+            return '<span class="mastery-star-empty">☆☆☆</span>';
         }
 
-
-        // --- Map Initialization ---
+        // --- Map & Game Logic ---
         function initMap() {
             if (map) return;
             map = L.map('map', { center: [20, 100], zoom: 3, minZoom: 2, maxBounds: [[-90, -180], [90, 180]], worldCopyJump: true });
@@ -219,9 +225,22 @@
             }).addTo(map);
         }
 
-        function startGame() {
-            quizStartScreen.classList.add('hidden');
+        function showHomeScreen() {
+            homeScreen.classList.remove('hidden');
+            gameUI.classList.add('hidden');
             endScreen.classList.add('hidden');
+            feedbackBox.classList.add('hidden');
+            clearMapLayers();
+            updateProgressSummary();
+        }
+
+        function startGame(mode) {
+            activeGameMode = mode;
+            homeScreen.classList.add('hidden');
+            if (mode === 'practice') {
+                startPracticeMode();
+                return;
+            }
             gameUI.classList.remove('hidden');
             score = 0;
             currentQuestionIndex = 0;
@@ -229,30 +248,38 @@
             shuffledDestinations = [...airwaysDestinations].sort(() => Math.random() - 0.5);
             nextQuestion();
         }
+
+        function startPracticeMode() {
+            gameUI.classList.remove('hidden');
+            destinationPrompt.textContent = "Practice Mode";
+            masteryDisplay.innerHTML = "";
+            questionCounter.textContent = "Explore";
+            scoreCounter.textContent = "-";
+            airwaysDestinations.forEach(dest => {
+                const marker = L.marker([dest.lat, dest.lon], { icon: L.divIcon({ className: 'practice-marker', iconSize: [12, 12] }) }).addTo(map);
+                const popupContent = `<b>${dest.city}, ${dest.country}</b><br>IATA: ${dest.iata} | ICAO: ${dest.icao}<br>Mastery: ${getMasteryStars(dest.city)}`;
+                marker.bindPopup(popupContent);
+                practiceMarkers.push(marker);
+            });
+        }
         
-        // --- Click Logic ---
         function handleMapClick(e) {
             map.off('click', mapClickListener);
-
             const userLatLng = e.latlng;
             const correctDestination = shuffledDestinations[currentQuestionIndex];
             const correctLatLng = L.latLng(correctDestination.lat, correctDestination.lon);
             const distance = calculateDistance(userLatLng.lat, userLatLng.lng, correctLatLng.lat, correctLatLng.lng);
-            
             guessMarker = L.marker(userLatLng, { icon: L.divIcon({ className: 'user-guess-icon', iconSize: [12, 12] }) }).addTo(map);
-            answerMarker = L.marker(correctLatLng, { icon: L.divIcon({ className: 'correct-answer-icon', iconSize: [12, 12] }) }).addTo(map).bindPopup(`<b>${correctDestination.city}</b>`).openPopup();
+            answerMarker = L.marker(correctLatLng, { icon: L.divIcon({ className: 'correct-answer-icon', iconSize: [12, 12] }) }).addTo(map).bindPopup(`<b>${correctDestination.city} (${correctDestination.iata})</b>`).openPopup();
             lineToAnswer = L.polyline([userLatLng, correctLatLng], { color: '#4f008c', weight: 2, dashArray: '5, 5' }).addTo(map);
             map.fitBounds(L.latLngBounds(userLatLng, correctLatLng), { padding: [70, 70] });
-            
             const isCorrect = distance <= 150;
             showFeedback(isCorrect, `You were ${Math.round(distance)} km away.`);
         }
         
-        // --- Game Flow Logic ---
         function nextQuestion() {
             clearMapLayers();
             feedbackBox.classList.add('hidden');
-
             if (currentQuestionIndex >= shuffledDestinations.length) {
                 endGame();
                 return;
@@ -269,15 +296,14 @@
                 feedbackText.textContent = "Excellent! You are correct!";
                 feedbackText.classList.remove('text-red-600');
                 feedbackText.classList.add('text-green-600');
-                // Increment progress
                 destinationProgress[correctDestination.city] = (destinationProgress[correctDestination.city] || 0) + 1;
                 saveProgress();
             } else {
-                feedbackText.textContent = `Not quite! The correct answer was ${correctDestination.city}.`;
+                feedbackText.textContent = `Not quite! The correct location was ${correctDestination.city}.`;
                 feedbackText.classList.remove('text-green-600');
                 feedbackText.classList.add('text-red-600');
             }
-            feedbackDetails.textContent = detailsText;
+            feedbackDetails.innerHTML = `${detailsText}<br><b>${correctDestination.iata} | ${correctDestination.icao}</b>`;
             feedbackBox.classList.remove('hidden');
             currentQuestionIndex++;
         }
@@ -293,26 +319,31 @@
             if (guessMarker) map.removeLayer(guessMarker);
             if (answerMarker) map.removeLayer(answerMarker);
             if (lineToAnswer) map.removeLayer(lineToAnswer);
+            practiceMarkers.forEach(marker => map.removeLayer(marker));
+            practiceMarkers = [];
             if(map) map.closePopup();
             guessMarker = null;
             answerMarker = null;
             lineToAnswer = null;
         }
 
-        function updateScoreDisplay() {
-            scoreCounter.textContent = score;
-        }
+        function updateScoreDisplay() { scoreCounter.textContent = score; }
 
         function updateQuestionDisplay() {
              const currentDestination = shuffledDestinations[currentQuestionIndex];
-             const promptText = `${currentDestination.city}, ${currentDestination.country}`;
+             let promptText;
+             if (activeGameMode === 'guessLocationName') {
+                promptText = `${currentDestination.city}, ${currentDestination.country}`;
+             } else {
+                promptText = `${currentDestination.iata} / ${currentDestination.icao}`;
+             }
              destinationPrompt.textContent = promptText;
              questionCounter.textContent = `${currentQuestionIndex + 1} / ${shuffledDestinations.length}`;
              masteryDisplay.innerHTML = getMasteryStars(currentDestination.city);
         }
 
         function calculateDistance(lat1, lon1, lat2, lon2) {
-            const R = 6371; // Radius of the earth in km
+            const R = 6371;
             const dLat = (lat2 - lat1) * Math.PI / 180;
             const dLon = (lon2 - lon1) * Math.PI / 180;
             const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLon / 2) * Math.sin(dLon / 2);
@@ -321,17 +352,51 @@
         }
 
         // --- Event Listeners ---
-        startQuizButton.addEventListener('click', startGame);
+        modeSelectButtons.forEach(button => {
+            button.addEventListener('click', (e) => startGame(e.currentTarget.dataset.mode));
+        });
+        backToHomeFromGameButton.addEventListener('click', showHomeScreen);
+        homeButtonFromEnd.addEventListener('click', showHomeScreen);
         nextButton.addEventListener('click', nextQuestion);
-        restartButton.addEventListener('click', startGame);
+        restartButton.addEventListener('click', () => {
+            endScreen.classList.add('hidden');
+            startGame(activeGameMode);
+        });
         resetProgressButton.addEventListener('click', resetProgress);
        
-        // --- Initialize ---
+        // --- App Initialization ---
         document.addEventListener('DOMContentLoaded', () => {
             initMap();
-            loadProgress();
-        });
+            
+            const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : null;
+            if (!firebaseConfig) {
+                console.error("Firebase config not found! This app will not work outside the intended environment without your own Firebase config.");
+                loadingScreen.innerHTML = "<h1>Connection Error</h1><p class='text-sm'>A Firebase configuration is required.</p>";
+                return;
+            }
+            
+            app = initializeApp(firebaseConfig);
+            db = getFirestore(app);
+            auth = getAuth(app);
 
+            onAuthStateChanged(auth, async (user) => {
+                if (user) {
+                    userIdDisplay.textContent = user.uid;
+                    loadProgress(user.uid);
+                } else {
+                    try {
+                        if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                            await signInWithCustomToken(auth, __initial_auth_token);
+                        } else {
+                            await signInAnonymously(auth);
+                        }
+                    } catch (error) {
+                        console.error("Authentication failed: ", error);
+                        loadingScreen.innerHTML = "<h1>Authentication Failed</h1>";
+                    }
+                }
+            });
+        });
     </script>
 </body>
 </html>
