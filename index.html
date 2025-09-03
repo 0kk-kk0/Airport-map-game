@@ -368,7 +368,15 @@
         document.addEventListener('DOMContentLoaded', () => {
             initMap();
             
-            const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : null;
+            const firebaseConfig = {
+                      apiKey: "AIzaSyD4v0iN7y1C9GEDYhgyxv2koaJCUxjtnqg",
+                      authDomain: "airport-qui.firebaseapp.com",
+                      projectId: "airport-qui",
+                      storageBucket: "airport-qui.firebasestorage.app",
+                      messagingSenderId: "66527997631",
+                      appId: "1:66527997631:web:942a882fb564ac8e78600a",
+                      measurementId: "G-J8QFJLJWMP"
+                    };
             if (!firebaseConfig) {
                 console.error("Firebase config not found! This app will not work outside the intended environment without your own Firebase config.");
                 loadingScreen.innerHTML = "<h1>Connection Error</h1><p class='text-sm'>A Firebase configuration is required.</p>";
