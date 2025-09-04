@@ -413,14 +413,15 @@
             initMap();
             
              // NOTE: Replace this with your actual Firebase config object if running locally
-            const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {
-                apiKey: "YOUR_API_KEY",
-                authDomain: "YOUR_AUTH_DOMAIN",
-                projectId: "YOUR_PROJECT_ID",
-                storageBucket: "YOUR_STORAGE_BUCKET",
-                messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
-                appId: "YOUR_APP_ID"
-            };
+            const firebaseConfig = {
+                                      apiKey: "AIzaSyD4v0iN7y1C9GEDYhgyxv2koaJCUxjtnqg",
+                                      authDomain: "airport-qui.firebaseapp.com",
+                                      projectId: "airport-qui",
+                                      storageBucket: "airport-qui.firebasestorage.app",
+                                      messagingSenderId: "66527997631",
+                                      appId: "1:66527997631:web:942a882fb564ac8e78600a",
+                                      measurementId: "G-J8QFJLJWMP"
+                                    };
 
             if (!firebaseConfig || !firebaseConfig.projectId) {
                 console.error("Firebase config not found! This app will not work outside the intended environment without your own Firebase config.");
