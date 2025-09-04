@@ -5,11 +5,14 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Airport Geography Challenge</title>
     
+    <!-- Tailwind CSS for styling -->
     <script src="https://cdn.tailwindcss.com"></script>
     
+    <!-- Leaflet.js for interactive maps -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
 
+    <!-- Google Fonts: Inter -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700;800&display=swap" rel="stylesheet">
@@ -102,6 +105,18 @@
                 </button>
             </div>
         </div>
+
+        <!-- Confirmation Modal -->
+        <div id="confirm-modal" class="screen-overlay hidden">
+            <div class="bg-white text-black p-8 rounded-lg shadow-xl max-w-sm text-center">
+                <h2 id="confirm-title" class="text-2xl font-bold mb-4">Reset Progress?</h2>
+                <p id="confirm-text" class="mb-6">Are you sure you want to reset all your progress? This cannot be undone.</p>
+                <div class="flex justify-center gap-4">
+                    <button id="confirm-yes-button" class="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-6 rounded-lg">Yes, Reset</button>
+                    <button id="confirm-no-button" class="bg-gray-300 hover:bg-gray-400 text-black font-bold py-2 px-6 rounded-lg">Cancel</button>
+                </div>
+            </div>
+        </div>
     </div>
 
     <script type="module">
@@ -136,6 +151,9 @@
         const masteryDisplay = document.getElementById('mastery-display');
         const masteredCount = document.getElementById('mastered-count');
         const userIdDisplay = document.getElementById('user-id-display');
+        const confirmModal = document.getElementById('confirm-modal');
+        const confirmYesButton = document.getElementById('confirm-yes-button');
+        const confirmNoButton = document.getElementById('confirm-no-button');
         
         // --- Game State ---
         let map;
@@ -149,6 +167,8 @@
         let practiceMarkers = [];
         let destinationProgress = {};
         let activeGameMode = null;
+        let isInitialLoad = true;
+        let onConfirmAction = null;
         
         // --- Firebase State ---
         let auth, db, app;
@@ -173,8 +193,11 @@
                     saveProgress(); 
                 }
                 updateProgressSummary();
-                loadingScreen.classList.add('hidden');
-                showHomeScreen();
+                if (isInitialLoad) {
+                    loadingScreen.classList.add('hidden');
+                    showHomeScreen();
+                    isInitialLoad = false;
+                }
             });
         }
 
@@ -190,14 +213,25 @@
         }
 
         async function resetProgress() {
-            if (confirm("Are you sure you want to reset all your progress? This cannot be undone.")) {
-                airwaysDestinations.forEach(dest => {
-                    destinationProgress[dest.city] = 0;
-                });
-                await saveProgress();
-                endScreen.classList.add('hidden');
-                showHomeScreen();
-            }
+            showConfirmModal(
+                'Reset Progress?',
+                'Are you sure you want to reset all your progress? This cannot be undone.',
+                async () => {
+                    airwaysDestinations.forEach(dest => {
+                        destinationProgress[dest.city] = 0;
+                    });
+                    await saveProgress();
+                    endScreen.classList.add('hidden');
+                    showHomeScreen();
+                }
+            );
+        }
+
+        function showConfirmModal(title, text, onConfirm) {
+            document.getElementById('confirm-title').textContent = title;
+            document.getElementById('confirm-text').textContent = text;
+            onConfirmAction = onConfirm;
+            confirmModal.classList.remove('hidden');
         }
 
         function updateProgressSummary() {
@@ -361,20 +395,34 @@
         });
         resetProgressButton.addEventListener('click', resetProgress);
         
+        confirmNoButton.addEventListener('click', () => {
+            confirmModal.classList.add('hidden');
+            onConfirmAction = null;
+        });
+
+        confirmYesButton.addEventListener('click', () => {
+            if (onConfirmAction) {
+                onConfirmAction();
+            }
+            confirmModal.classList.add('hidden');
+            onConfirmAction = null;
+        });
+        
         // --- App Initialization ---
         document.addEventListener('DOMContentLoaded', () => {
             initMap();
             
-            const firebaseConfig = {
-                        apiKey: "AIzaSyD4v0iN7y1C9GEDYhgyxv2koaJCUxjtnqg",
-                        authDomain: "airport-qui.firebaseapp.com",
-                        projectId: "airport-qui",
-                        storageBucket: "airport-qui.firebasestorage.app",
-                        messagingSenderId: "66527997631",
-                        appId: "1:66527997631:web:942a882fb564ac8e78600a",
-                        measurementId: "G-J8QFJLJWMP"
-                    };
-            if (!firebaseConfig) {
+             // NOTE: Replace this with your actual Firebase config object if running locally
+            const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {
+                apiKey: "YOUR_API_KEY",
+                authDomain: "YOUR_AUTH_DOMAIN",
+                projectId: "YOUR_PROJECT_ID",
+                storageBucket: "YOUR_STORAGE_BUCKET",
+                messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
+                appId: "YOUR_APP_ID"
+            };
+
+            if (!firebaseConfig || !firebaseConfig.projectId) {
                 console.error("Firebase config not found! This app will not work outside the intended environment without your own Firebase config.");
                 loadingScreen.innerHTML = "<h1>Connection Error</h1><p class='text-sm'>A Firebase configuration is required.</p>";
                 return;
@@ -390,8 +438,9 @@
                     loadProgress(user.uid);
                 } else {
                     try {
-                        if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-                            await signInWithCustomToken(auth, __initial_auth_token);
+                        const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+                        if (initialAuthToken) {
+                            await signInWithCustomToken(auth, initialAuthToken);
                         } else {
                             await signInAnonymously(auth);
                         }
@@ -405,3 +454,4 @@
     </script>
 </body>
 </html>
+
