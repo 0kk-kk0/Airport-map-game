@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Airport Geography Challenge</title>
+    <title>Multi-Game Challenge</title>
     
     <!-- Tailwind CSS for styling -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -12,109 +12,183 @@
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
 
-    <!-- Google Fonts: Inter -->
+    <!-- Google Fonts: Inter & Roboto Mono -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700;800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Roboto+Mono:wght@400;700&display=swap" rel="stylesheet">
+
+    <!-- KaTeX for beautiful math rendering -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css" xintegrity="sha384-n8MVd4RsNIU0KOVEMckDpbRei4iuOorsMa2xz/bCaVXSwnsoDhevrVoQfxn6MVqd" crossorigin="anonymous">
+    <script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js" xintegrity="sha384-XjKyOOlVwcjNcsNQpWgfdTAnMGTNXEhsRRCggSFrFXgNmjS2JkGx8o7gKjV2jHrv" crossorigin="anonymous"></script>
+
 
     <style>
         body { font-family: 'Inter', sans-serif; touch-action: none; }
+        .screen-overlay { position: absolute; inset: 0; background-color: rgba(0,0,0,0.85); display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; color: white; padding: 2rem; z-index: 30; }
+        
+        /* --- Airport Game Specific Styles --- */
         #map { height: 100vh; width: 100vw; z-index: 10; background-color: #a2d1f7; }
         .correct-answer-icon { background-color: #4f008c; border: 2px solid white; border-radius: 50%; box-shadow: 0 0 10px rgba(0,0,0,0.5); }
         .user-guess-icon { background-color: #f5a623; border: 2px solid white; border-radius: 50%; box-shadow: 0 0 10px rgba(0,0,0,0.5); }
-        .screen-overlay { position: absolute; inset: 0; background-color: rgba(0,0,0,0.8); display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; color: white; padding: 2rem; z-index: 30; }
         .mastery-star { color: #FFD700; text-shadow: 0 0 2px black; }
         .mastery-star-empty { color: #a0a0a0; }
         .leaflet-popup-content-wrapper { background-color: #2d3748; color: white; border-radius: 8px; }
         .leaflet-popup-content { margin: 13px 19px; line-height: 1.4; }
         .leaflet-popup-tip { background: #2d3748; }
         .leaflet-marker-icon.practice-marker { background-color: rgba(79, 0, 140, 0.7); border: 2px solid white; border-radius: 50%; }
+
+        /* --- Approximation Quiz Specific Styles --- */
+        #approx-game-container { font-family: 'Inter', sans-serif; background-color: #1a202c; color: #e2e8f0;}
+        .approx-option { transition: background-color 0.2s, transform 0.2s; }
+        .approx-option:hover { background-color: #4a5568; transform: translateY(-2px); }
+        .correct-option { background-color: #2f855a !important; color: white; }
+        .incorrect-option { background-color: #c53030 !important; color: white; }
+        /* KaTeX font size adjustment */
+        .katex-display { font-size: 2.25rem; }
     </style>
 </head>
-<body class="bg-gray-100 overflow-hidden">
+<body class="bg-gray-800 overflow-hidden">
 
     <div id="game-container" class="relative w-screen h-screen">
-        <div id="map"></div>
-
-        <div id="loading-screen" class="screen-overlay">
-            <h1 class="text-4xl font-bold">Connecting...</h1>
+        <!-- Shared Elements -->
+        <div id="loading-screen" class="screen-overlay"><h1 class="text-4xl font-bold">Connecting...</h1></div>
+        <div id="confirm-modal" class="screen-overlay hidden">
+             <div class="bg-white text-black p-8 rounded-lg shadow-xl max-w-sm text-center">
+                 <h2 id="confirm-title" class="text-2xl font-bold mb-4">Reset Progress?</h2>
+                 <p id="confirm-text" class="mb-6">Are you sure?</p>
+                 <div class="flex justify-center gap-4">
+                     <button id="confirm-yes-button" class="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-6 rounded-lg">Yes</button>
+                     <button id="confirm-no-button" class="bg-gray-300 hover:bg-gray-400 text-black font-bold py-2 px-6 rounded-lg">Cancel</button>
+                 </div>
+             </div>
         </div>
 
+        <!-- Home Screen (Game Selector) -->
         <div id="home-screen" class="screen-overlay hidden">
-            <h1 class="text-4xl md:text-6xl font-extrabold mb-4 text-purple-300">Airport Challenge</h1>
-            <p class="text-lg md:text-xl mb-6 max-w-2xl">Prepare for your captain interview by mastering the Thai Airways routes.</p>
-            <div id="progress-summary" class="mb-4 text-lg bg-black/30 p-4 rounded-lg">
-                <p>Mastered: <span id="mastered-count">0</span> / 64</p>
+            <h1 class="text-4xl md:text-6xl font-extrabold mb-4 text-purple-300">Game Challenge</h1>
+            <p class="text-lg md:text-xl mb-8 max-w-2xl">Select a game to begin.</p>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-4xl w-full">
+                <div id="select-airport-game" class="cursor-pointer bg-gray-900/50 p-6 rounded-lg border-2 border-transparent hover:border-purple-500 transition-all">
+                    <h2 class="text-3xl font-bold mb-2 text-purple-400">Airport Challenge</h2>
+                    <p class="text-gray-300">Master Thai Airways routes by finding destinations on the map.</p>
+                </div>
+                <div id="select-approx-game" class="cursor-pointer bg-gray-900/50 p-6 rounded-lg border-2 border-transparent hover:border-teal-500 transition-all">
+                    <h2 class="text-3xl font-bold mb-2 text-teal-400">Approximation Quiz</h2>
+                    <p class="text-gray-300">Test your mental math skills with rapid-fire approximation problems.</p>
+                </div>
             </div>
-             <div class="mb-8 text-xs bg-black/30 p-2 rounded-lg">
-                <p>User ID: <span id="user-id-display"></span></p>
-            </div>
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-                 <button data-mode="practice" class="mode-select-button bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-6 rounded-lg text-xl shadow-lg transition-transform transform hover:scale-105">Practice Mode</button>
-                 <button data-mode="guessLocationName" class="mode-select-button bg-purple-600 hover:bg-purple-700 text-white font-bold py-3 px-6 rounded-lg text-xl shadow-lg transition-transform transform hover:scale-105">Guess Location by Name</button>
-                 <button data-mode="guessLocationCode" class="mode-select-button bg-teal-600 hover:bg-teal-700 text-white font-bold py-3 px-6 rounded-lg text-xl shadow-lg transition-transform transform hover:scale-105">Guess Location by Code</button>
-            </div>
+             <div class="mt-8 text-xs bg-black/30 p-2 rounded-lg">User ID: <span id="user-id-display"></span></div>
         </div>
         
-        <div id="game-ui" class="absolute top-0 left-0 w-full p-4 md:p-6 z-20 hidden pointer-events-none">
-            <div class="max-w-7xl mx-auto flex justify-between items-center bg-white/80 backdrop-blur-sm p-4 rounded-xl shadow-lg pointer-events-auto">
-                <button id="back-to-home-from-game" class="bg-gray-400 hover:bg-gray-500 text-white font-bold p-2 rounded-full mr-4">
-                     <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1V10a1 1 0 00-1-1H7a1 1 0 00-1 1v10a1 1 0 001 1h2z" /></svg>
-                </button>
-                <div class="flex-1">
-                    <p class="text-sm font-medium text-gray-500">Find this destination:</p>
-                    <div class="flex items-center gap-2">
-                        <h2 id="destination-prompt" class="text-xl md:text-3xl font-bold text-purple-800"></h2>
-                        <span id="mastery-display" class="text-xl md:text-2xl"></span>
+        <!-- Airport Geography Game -->
+        <div id="airport-game-container" class="hidden">
+            <div id="map"></div>
+            <div id="airport-home-screen" class="screen-overlay">
+                 <h1 class="text-4xl md:text-6xl font-extrabold mb-4 text-purple-300">Airport Challenge</h1>
+                 <div id="progress-summary" class="mb-4 text-lg bg-black/30 p-4 rounded-lg">
+                     <p>Mastered: <span id="mastered-count">0</span> / 64</p>
+                 </div>
+                 <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                     <button data-mode="practice" class="mode-select-button bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-6 rounded-lg text-xl shadow-lg">Practice</button>
+                     <button data-mode="guessLocationName" class="mode-select-button bg-purple-600 hover:bg-purple-700 text-white font-bold py-3 px-6 rounded-lg text-xl shadow-lg">Guess by Name</button>
+                     <button data-mode="guessLocationCode" class="mode-select-button bg-teal-600 hover:bg-teal-700 text-white font-bold py-3 px-6 rounded-lg text-xl shadow-lg">Guess by Code</button>
+                 </div>
+                 <button id="back-to-main-menu-airport" class="mt-8 bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded-lg">Back to Main Menu</button>
+            </div>
+            <div id="airport-game-ui" class="absolute top-0 left-0 w-full p-4 md:p-6 z-20 hidden pointer-events-none">
+                <div class="max-w-7xl mx-auto flex justify-between items-center bg-white/80 backdrop-blur-sm p-4 rounded-xl shadow-lg pointer-events-auto">
+                    <button id="back-to-airport-home" class="bg-gray-400 hover:bg-gray-500 text-white font-bold p-2 rounded-full mr-4">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1V10a1 1 0 00-1-1H7a1 1 0 00-1 1v10a1 1 0 001 1h2z" /></svg>
+                    </button>
+                    <div class="flex-1">
+                        <p class="text-sm font-medium text-gray-500">Find this destination:</p>
+                        <div class="flex items-center gap-2">
+                             <h2 id="destination-prompt" class="text-xl md:text-3xl font-bold text-purple-800"></h2>
+                             <span id="mastery-display" class="text-xl md:text-2xl"></span>
+                        </div>
+                    </div>
+                    <div class="text-right ml-4"><p class="text-sm text-gray-500">Question</p><p id="question-counter" class="text-xl md:text-3xl font-bold text-gray-700"></p></div>
+                    <div class="text-right ml-4 border-l pl-4"><p class="text-sm text-gray-500">Score</p><p id="score-counter" class="text-2xl md:text-3xl font-bold text-green-600">0</p></div>
+                </div>
+            </div>
+            <div id="airport-feedback-box" class="absolute bottom-0 left-0 w-full p-4 md:p-6 z-20 hidden pointer-events-none">
+                 <div class="max-w-md mx-auto bg-white p-6 rounded-xl shadow-2xl text-center pointer-events-auto">
+                     <p id="feedback-text" class="text-xl font-semibold mb-4"></p>
+                     <p id="feedback-details" class="text-gray-600 mb-4"></p>
+                     <button id="next-button" class="w-full bg-purple-600 hover:bg-purple-700 text-white font-bold py-3 px-6 rounded-lg text-lg">Next</button>
+                 </div>
+            </div>
+            <div id="airport-end-screen" class="screen-overlay hidden">
+                 <h1 class="text-4xl md:text-6xl font-extrabold mb-4 text-purple-300">Quiz Complete!</h1>
+                 <p class="text-lg md:text-xl mb-4">Final Score:</p>
+                 <p id="final-score" class="text-7xl font-bold mb-8 text-green-400"></p>
+                 <div class="flex flex-col sm:flex-row gap-4">
+                     <button id="restart-button" class="bg-purple-600 hover:bg-purple-700 text-white font-bold py-3 px-8 rounded-lg text-xl">Play Again</button>
+                     <button id="airport-home-from-end" class="bg-gray-500 hover:bg-gray-600 text-white font-bold py-3 px-8 rounded-lg text-xl">Home</button>
+                     <button id="reset-progress-button" class="bg-red-600 hover:bg-red-700 text-white font-bold py-3 px-8 rounded-lg text-xl">Reset Progress</button>
+                 </div>
+            </div>
+        </div>
+
+        <!-- Approximation Math Game -->
+        <div id="approx-game-container" class="w-full h-full flex-col justify-center items-center p-8 hidden">
+             <!-- Approximation Mode Selection -->
+            <div id="approx-home-screen" class="screen-overlay">
+                 <h1 class="text-4xl md:text-6xl font-extrabold mb-4 text-teal-300">Approximation Quiz</h1>
+                 <p class="text-lg md:text-xl mb-8 max-w-2xl">Choose your challenge.</p>
+                 <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                     <button id="approx-practice-mode-btn" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-4 px-8 rounded-lg text-xl shadow-lg">Practice Mode</button>
+                     <button id="approx-test-mode-btn" class="bg-red-600 hover:bg-red-700 text-white font-bold py-4 px-8 rounded-lg text-xl shadow-lg">Test Mode</button>
+                 </div>
+                 <button id="back-to-main-menu-approx" class="mt-8 bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded-lg">Back to Main Menu</button>
+            </div>
+
+             <div id="approx-game-ui" class="w-full max-w-4xl mx-auto hidden">
+                <!-- Header -->
+                <div class="flex justify-between items-center mb-6">
+                    <div class="flex items-center gap-4">
+                        <button id="approx-back-to-home-ingame" class="bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded-lg">Home</button>
+                        <div>
+                            <div id="approx-mode-display" class="text-xl font-bold text-white"></div>
+                            <div id="approx-question-counter" class="text-sm text-gray-400"></div>
+                        </div>
+                    </div>
+                    <div class="text-right">
+                        <div id="approx-timer-label" class="text-sm text-gray-400">TIME</div>
+                        <div id="approx-timer" class="text-3xl font-bold text-teal-400"></div>
                     </div>
                 </div>
-                <div class="text-right ml-4">
-                     <p class="text-sm font-medium text-gray-500">Question</p>
-                    <p id="question-counter" class="text-xl md:text-3xl font-bold text-gray-700"></p>
+                
+                <!-- Game Content -->
+                <div id="approx-content">
+                    <div class="bg-gray-900/50 p-8 rounded-lg text-center mb-6 min-h-[150px] flex justify-center items-center">
+                        <h2 id="approx-question" class="text-white"></h2>
+                    </div>
+                    <div id="approx-options" class="grid grid-cols-1 md:grid-cols-2 gap-4"></div>
                 </div>
-                 <div class="text-right ml-4 border-l pl-4">
-                     <p class="text-sm font-medium text-gray-500">Score</p>
-                    <p id="score-counter" class="text-2xl md:text-3xl font-bold text-green-600">0</p>
+                
+                <!-- Feedback/Answer Key (Practice Mode Only) -->
+                <div id="approx-feedback" class="hidden mt-6 bg-gray-900/50 p-6 rounded-lg">
+                     <h3 id="feedback-title" class="text-2xl font-bold mb-3"></h3>
+                     <div id="answer-key" class="text-left">
+                        <p class="font-semibold text-teal-300">The Trick (How to Estimate):</p>
+                        <p id="answer-key-trick" class="font-mono bg-black/30 p-3 rounded-md"></p>
+                        <p class="mt-2 text-gray-400">The exact answer is <b id="exact-answer" class="text-white"></b>.</p>
+                     </div>
+                     <button id="approx-next-btn" class="w-full mt-4 bg-teal-600 hover:bg-teal-700 text-white font-bold py-3 rounded-lg text-lg">Next Question</button>
                 </div>
-            </div>
-        </div>
-        
-        <div id="feedback-box" class="absolute bottom-0 left-0 w-full p-4 md:p-6 z-20 hidden pointer-events-none">
-            <div class="max-w-md mx-auto bg-white p-6 rounded-xl shadow-2xl text-center pointer-events-auto">
-                <p id="feedback-text" class="text-xl font-semibold mb-4"></p>
-                <p id="feedback-details" class="text-gray-600 mb-4"></p>
-                <button id="next-button" class="w-full bg-purple-600 hover:bg-purple-700 text-white font-bold py-3 px-6 rounded-lg text-lg shadow-lg transition-transform transform hover:scale-105">
-                    Next Question
-                </button>
-            </div>
-        </div>
+             </div>
 
-         <div id="end-screen" class="screen-overlay hidden">
-            <h1 class="text-4xl md:text-6xl font-extrabold mb-4 text-purple-300">Quiz Complete!</h1>
-            <p class="text-lg md:text-xl mb-4">Your Final Score:</p>
-            <p id="final-score" class="text-7xl font-bold mb-8 text-green-400"></p>
-            <div class="flex flex-col sm:flex-row gap-4">
-                <button id="restart-button" class="bg-purple-600 hover:bg-purple-700 text-white font-bold py-3 px-8 rounded-lg text-xl shadow-lg transition-transform transform hover:scale-105">
-                    Play Again
-                </button>
-                 <button id="home-button-from-end" class="bg-gray-500 hover:bg-gray-600 text-white font-bold py-3 px-8 rounded-lg text-xl shadow-lg transition-transform transform hover:scale-105">
-                    Home
-                </button>
-                <button id="reset-progress-button" class="bg-red-600 hover:bg-red-700 text-white font-bold py-3 px-8 rounded-lg text-xl shadow-lg transition-transform transform hover:scale-105">
-                    Reset Progress
-                </button>
-            </div>
-        </div>
-
-        <!-- Confirmation Modal -->
-        <div id="confirm-modal" class="screen-overlay hidden">
-            <div class="bg-white text-black p-8 rounded-lg shadow-xl max-w-sm text-center">
-                <h2 id="confirm-title" class="text-2xl font-bold mb-4">Reset Progress?</h2>
-                <p id="confirm-text" class="mb-6">Are you sure you want to reset all your progress? This cannot be undone.</p>
-                <div class="flex justify-center gap-4">
-                    <button id="confirm-yes-button" class="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-6 rounded-lg">Yes, Reset</button>
-                    <button id="confirm-no-button" class="bg-gray-300 hover:bg-gray-400 text-black font-bold py-2 px-6 rounded-lg">Cancel</button>
-                </div>
+             <!-- End Screen for Approx Game -->
+            <div id="approx-end-screen" class="screen-overlay hidden">
+                 <h1 class="text-4xl md:text-6xl font-extrabold mb-4 text-teal-300">Quiz Over!</h1>
+                 <p class="text-lg md:text-xl mb-4">Your Final Score:</p>
+                 <p id="approx-final-score" class="text-7xl font-bold mb-8 text-teal-400"></p>
+                 <div class="flex gap-4">
+                     <button id="approx-restart-button" class="bg-teal-600 hover:bg-teal-700 text-white font-bold py-3 px-8 rounded-lg text-xl">Play Again</button>
+                     <button id="approx-home-button" class="bg-gray-500 hover:bg-gray-600 text-white font-bold py-3 px-8 rounded-lg text-xl">Main Menu</button>
+                 </div>
             </div>
         </div>
     </div>
@@ -122,311 +196,492 @@
     <script type="module">
         // Firebase Imports
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, doc, onSnapshot, setDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-        // --- DATASET ---
+        // --- SHARED STATE & DOM ---
+        const loadingScreen = document.getElementById('loading-screen');
+        const homeScreen = document.getElementById('home-screen');
+        const confirmModal = document.getElementById('confirm-modal');
+        const confirmYesButton = document.getElementById('confirm-yes-button');
+        const confirmNoButton = document.getElementById('confirm-no-button');
+        const userIdDisplay = document.getElementById('user-id-display');
+
+        let auth, db, app, userId;
+        let onConfirmAction = null;
+        let isInitialLoad = true;
+        
+        // --- Game Containers ---
+        const airportGameContainer = document.getElementById('airport-game-container');
+        const approxGameContainer = document.getElementById('approx-game-container');
+        
+        // --- Game Selectors ---
+        const selectAirportGame = document.getElementById('select-airport-game');
+        const selectApproxGame = document.getElementById('select-approx-game');
+
+        // =================================================================
+        // ::: APPROXIMATION QUIZ LOGIC :::
+        // =================================================================
+        const approxDOM = {
+            container: document.getElementById('approx-game-container'),
+            homeScreen: document.getElementById('approx-home-screen'),
+            gameUI: document.getElementById('approx-game-ui'),
+            practiceModeBtn: document.getElementById('approx-practice-mode-btn'),
+            testModeBtn: document.getElementById('approx-test-mode-btn'),
+            content: document.getElementById('approx-content'),
+            question: document.getElementById('approx-question'),
+            options: document.getElementById('approx-options'),
+            modeDisplay: document.getElementById('approx-mode-display'),
+            questionCounter: document.getElementById('approx-question-counter'),
+            timer: document.getElementById('approx-timer'),
+            timerLabel: document.getElementById('approx-timer-label'),
+            feedback: document.getElementById('approx-feedback'),
+            feedbackTitle: document.getElementById('feedback-title'),
+            answerKeyTrick: document.getElementById('answer-key-trick'),
+            exactAnswer: document.getElementById('exact-answer'),
+            nextBtn: document.getElementById('approx-next-btn'),
+            endScreen: document.getElementById('approx-end-screen'),
+            finalScore: document.getElementById('approx-final-score'),
+            restartBtn: document.getElementById('approx-restart-button'),
+            homeBtn: document.getElementById('approx-home-button'),
+            backToMenuBtn: document.getElementById('back-to-main-menu-approx'),
+            ingameHomeBtn: document.getElementById('approx-back-to-home-ingame'),
+        };
+
+        const approxState = {
+            questions: [],
+            currentQIndex: 0,
+            correctAnswers: 0,
+            timer: null,
+            timeLeft: 0,
+            activeMode: 'practice', // 'practice' or 'test'
+        };
+
+        const approxQuestions = [
+            { latex: "\\frac{2.35 \\times 4.27}{3.67} \\times 3.56", answer: 9.74, trick: "\\frac{2.5 \\times 4}{3.5} \\times 3.5 \\approx 10" },
+            { latex: "\\frac{8.12 \\times 1.95}{4.09} \\times 2.41", answer: 9.33, trick: "\\frac{8 \\times 2}{4} \\times 2.5 = 4 \\times 2.5 = 10" },
+            { latex: "\\frac{5.78 \\times 6.02}{2.11} \\times 1.15", answer: 18.96, trick: "\\frac{6 \\times 6}{2} \\times 1 = 18" },
+            { latex: "\\frac{3.45 \\times 7.89}{1.23} \\times 0.98", answer: 21.69, trick: "\\frac{3.5 \\times 8}{1.25} \\times 1 \\approx 28 / 1.25 \\approx 22" },
+            { latex: "\\frac{9.63 \\times 2.05}{5.55} \\times 4.72", answer: 16.79, trick: "\\frac{10 \\times 2}{5} \\times 4.5 = 4 \\times 4.5 = 18" },
+            { latex: "\\frac{6.14 \\times 3.81}{2.92} \\times 1.55", answer: 12.42, trick: "\\frac{6 \\times 4}{3} \\times 1.5 = 8 \\times 1.5 = 12" },
+            { latex: "\\frac{4.09 \\times 5.22}{1.76} \\times 0.89", answer: 10.80, trick: "\\frac{4 \\times 5}{2} \\times 1 = 10" },
+            { latex: "\\frac{10.34 \\times 1.87}{5.01} \\times 2.54", answer: 9.80, trick: "\\frac{10 \\times 2}{5} \\times 2.5 = 4 \\times 2.5 = 10" },
+            { latex: "\\frac{7.53 \\times 2.18}{8.04} \\times 5.13", answer: 10.47, trick: "\\frac{7.5}{8} \\times 2 \\times 5 \\approx 1 \\times 10 = 10" },
+            { latex: "\\frac{1.99 \\times 8.45}{3.21} \\times 2.01", answer: 10.53, trick: "\\frac{2 \\times 8.5}{3} \\times 2 \\approx 5.7 \\times 2 = 11.4" },
+            { latex: "\\frac{9.27 \\times 0.95}{4.65} \\times 7.33", answer: 13.88, trick: "\\frac{9.3}{4.65} \\times 1 \\times 7.3 \\approx 2 \\times 7.3 = 14.6" },
+            { latex: "\\frac{3.72 \\times 4.15}{6.88} \\times 3.91", answer: 8.77, trick: "\\frac{4 \\times 4}{7} \\times 4 \\approx 2.3 \\times 4 = 9.2" },
+            { latex: "\\frac{5.06 \\times 6.78}{2.25} \\times 1.12", answer: 17.08, trick: "\\frac{5 \\times 7}{2.25} \\times 1 \\approx 35 / 2.25 \\approx 15.5" },
+            { latex: "\\frac{8.88 \\times 3.03}{9.12} \\times 4.44", answer: 13.10, trick: "\\frac{9 \\times 3}{9} \\times 4.4 = 3 \\times 4.4 = 13.2" },
+            { latex: "\\frac{2.67 \\times 7.19}{4.28} \\times 6.05", answer: 27.14, trick: "\\frac{2.5 \\times 7}{4} \\times 6 \\approx 4.4 \\times 6 = 26.4" },
+            { latex: "\\frac{12.1 \\times 3.9}{5.95} \\times 2.05", answer: 16.24, trick: "\\frac{12 \\times 4}{6} \\times 2 = 8 \\times 2 = 16" },
+            { latex: "\\frac{1.05 \\times 14.8}{3.01} \\times 4.92", answer: 25.48, trick: "\\frac{1 \\times 15}{3} \\times 5 = 5 \\times 5 = 25" },
+            { latex: "\\frac{19.8 \\times 2.51}{4.99} \\times 1.52", answer: 15.13, trick: "\\frac{20 \\times 2.5}{5} \\times 1.5 = 10 \\times 1.5 = 15" },
+            { latex: "\\frac{7.8 \\times 8.2}{1.99} \\times 0.51", answer: 16.31, trick: "\\frac{8 \\times 8}{2} \\times 0.5 = 32 \\times 0.5 = 16" },
+            { latex: "\\frac{9.9 \\times 10.1}{2.48} \\times 0.98", answer: 39.50, trick: "\\frac{10 \\times 10}{2.5} \\times 1 = 100 / 2.5 = 40" }
+        ];
+
+        function generateApproxOptions(correctAnswer) {
+            let options = new Set([correctAnswer]);
+            while (options.size < 4) {
+                const offset = (Math.random() - 0.5) * 0.1; // small random difference
+                const randomAnswer = parseFloat((correctAnswer * (1 + offset)).toFixed(2));
+                if (randomAnswer !== correctAnswer) {
+                    options.add(randomAnswer);
+                }
+            }
+            return Array.from(options).sort(() => Math.random() - 0.5);
+        }
+
+        function startApproxGame(mode) {
+            approxState.activeMode = mode;
+            approxState.questions = [...approxQuestions].sort(() => Math.random() - 0.5);
+            approxState.currentQIndex = 0;
+            approxState.correctAnswers = 0;
+            
+            approxDOM.homeScreen.classList.add('hidden');
+            approxDOM.gameUI.classList.remove('hidden');
+            approxDOM.endScreen.classList.add('hidden');
+
+            if (mode === 'practice') {
+                approxDOM.modeDisplay.textContent = 'Practice Mode';
+                approxDOM.timerLabel.style.display = 'none';
+                approxDOM.timer.style.display = 'none';
+                displayApproxQuestion();
+            } else { // Test Mode
+                approxDOM.modeDisplay.textContent = 'Test Mode';
+                approxDOM.timerLabel.style.display = 'block';
+                approxDOM.timer.style.display = 'block';
+                startTestTimer();
+                displayApproxQuestion();
+            }
+        }
+
+        function displayApproxQuestion() {
+            if (approxState.activeMode === 'test' && approxState.currentQIndex >= 20) {
+                endApproxGame();
+                return;
+            }
+            if (approxState.activeMode === 'practice' && approxState.currentQIndex >= approxState.questions.length) {
+                endApproxGame();
+                return;
+            }
+
+            approxDOM.content.classList.remove('hidden');
+            approxDOM.feedback.classList.add('hidden');
+            const q = approxState.questions[approxState.currentQIndex];
+            
+            katex.render(q.latex, approxDOM.question, { throwOnError: false, displayMode: true });
+
+            const options = generateApproxOptions(q.answer);
+            approxDOM.options.innerHTML = '';
+            options.forEach(opt => {
+                const button = document.createElement('button');
+                button.textContent = opt.toFixed(2);
+                button.className = "approx-option w-full bg-gray-700 p-4 rounded-lg text-2xl font-bold cursor-pointer";
+                button.onclick = () => selectApproxAnswer(button, opt === q.answer);
+                approxDOM.options.appendChild(button);
+            });
+            
+            if (approxState.activeMode === 'test') {
+                approxDOM.questionCounter.textContent = `Question ${approxState.currentQIndex + 1} of 20`;
+            } else {
+                approxDOM.questionCounter.textContent = `Question ${approxState.currentQIndex + 1}`;
+            }
+        }
+
+        function formatTime(seconds) {
+            const minutes = Math.floor(seconds / 60);
+            const remainingSeconds = seconds % 60;
+            return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
+        }
+
+        function startTestTimer() {
+            approxState.timeLeft = 360; // 6 minutes
+            clearInterval(approxState.timer);
+            approxDOM.timer.textContent = formatTime(approxState.timeLeft);
+            approxState.timer = setInterval(() => {
+                approxState.timeLeft--;
+                approxDOM.timer.textContent = formatTime(approxState.timeLeft);
+                if (approxState.timeLeft <= 0) {
+                    clearInterval(approxState.timer);
+                    endApproxGame();
+                }
+            }, 1000);
+        }
+
+        function selectApproxAnswer(selectedButton, isCorrect) {
+            if (isCorrect) {
+                approxState.correctAnswers++;
+            }
+
+            if (approxState.activeMode === 'practice') {
+                const q = approxState.questions[approxState.currentQIndex];
+                approxDOM.feedbackTitle.textContent = isCorrect ? "Correct!" : "Not Quite...";
+                approxDOM.feedbackTitle.className = `text-2xl font-bold mb-3 ${isCorrect ? 'text-green-400' : 'text-red-400'}`;
+
+                Array.from(approxDOM.options.children).forEach(button => {
+                    button.disabled = true;
+                    if (parseFloat(button.textContent) === q.answer) button.classList.add('correct-option');
+                    else if (button === selectedButton) button.classList.add('incorrect-option');
+                });
+
+                approxDOM.answerKeyTrick.textContent = q.trick;
+                approxDOM.exactAnswer.textContent = q.answer.toFixed(2);
+                approxDOM.content.classList.add('hidden');
+                approxDOM.feedback.classList.remove('hidden');
+            } else { // Test mode
+                approxState.currentQIndex++;
+                displayApproxQuestion();
+            }
+        }
+        
+        function endApproxGame() {
+            clearInterval(approxState.timer);
+            approxDOM.gameUI.classList.add('hidden');
+            if (approxState.activeMode === 'test') {
+                approxDOM.finalScore.textContent = `${approxState.correctAnswers} / 20`;
+            } else {
+                 approxDOM.finalScore.textContent = `${approxState.correctAnswers} / ${approxState.questions.length}`;
+            }
+            approxDOM.endScreen.classList.remove('hidden');
+        }
+        
+        approxDOM.practiceModeBtn.addEventListener('click', () => startApproxGame('practice'));
+        approxDOM.testModeBtn.addEventListener('click', () => startApproxGame('test'));
+        approxDOM.nextBtn.addEventListener('click', () => {
+             approxState.currentQIndex++;
+             displayApproxQuestion();
+        });
+        approxDOM.restartBtn.addEventListener('click', () => startApproxGame(approxState.activeMode));
+        approxDOM.homeBtn.addEventListener('click', showMainMenu);
+        approxDOM.backToMenuBtn.addEventListener('click', showMainMenu);
+        approxDOM.ingameHomeBtn.addEventListener('click', () => {
+            clearInterval(approxState.timer);
+            showMainMenu();
+        });
+
+        // =================================================================
+        // ::: AIRPORT GEOGRAPHY LOGIC :::
+        // =================================================================
+        const airportDOM = {
+            container: document.getElementById('airport-game-container'),
+            homeScreen: document.getElementById('airport-home-screen'),
+            endScreen: document.getElementById('airport-end-screen'),
+            gameUI: document.getElementById('airport-game-ui'),
+            modeSelectButtons: document.querySelectorAll('.mode-select-button'),
+            restartButton: document.getElementById('restart-button'),
+            resetProgressButton: document.getElementById('reset-progress-button'),
+            backToAirportHome: document.getElementById('back-to-airport-home'),
+            airportHomeFromEnd: document.getElementById('airport-home-from-end'),
+            backToMainMenu: document.getElementById('back-to-main-menu-airport'),
+            destinationPrompt: document.getElementById('destination-prompt'),
+            questionCounter: document.getElementById('question-counter'),
+            scoreCounter: document.getElementById('score-counter'),
+            finalScore: document.getElementById('final-score'),
+            feedbackBox: document.getElementById('airport-feedback-box'),
+            feedbackText: document.getElementById('feedback-text'),
+            feedbackDetails: document.getElementById('feedback-details'),
+            nextButton: document.getElementById('next-button'),
+            masteryDisplay: document.getElementById('mastery-display'),
+            masteredCount: document.getElementById('mastered-count'),
+        };
+        
+        const airportState = {
+            map: null,
+            score: 0,
+            currentQuestionIndex: 0,
+            shuffledDestinations: [],
+            mapClickListener: null,
+            guessMarker: null,
+            answerMarker: null,
+            lineToAnswer: null,
+            practiceMarkers: [],
+            destinationProgress: {},
+            activeGameMode: null,
+            progressUnsubscribe: null,
+        };
+
         const airwaysDestinations = [
             { city: "Chiang Mai", country: "Thailand", iata: "CNX", icao: "VTCC", lat: 18.7669, lon: 98.9626 }, { city: "Chiang Rai", country: "Thailand", iata: "CEI", icao: "VTCT", lat: 19.9546, lon: 99.8828 }, { city: "Khon Kaen", country: "Thailand", iata: "KKC", icao: "VTUK", lat: 16.4673, lon: 102.7852 }, { city: "Udon Thani", country: "Thailand", iata: "UTH", icao: "VTUD", lat: 17.3871, lon: 102.8122 }, { city: "Ubon Ratchathani", country: "Thailand", iata: "UBP", icao: "VTUU", lat: 15.2508, lon: 104.8690 }, { city: "Krabi", country: "Thailand", iata: "KBV", icao: "VTSG", lat: 8.0945, lon: 98.9877 }, { city: "Hat Yai", country: "Thailand", iata: "HDY", icao: "VTSS", lat: 6.9328, lon: 100.3950 }, { city: "Phuket", country: "Thailand", iata: "HKT", icao: "VTSP", lat: 8.1132, lon: 98.3168 }, { city: "Ahmedabad", country: "India", iata: "AMD", icao: "VAAH", lat: 23.0734, lon: 72.6347 }, { city: "Beijing", country: "China", iata: "PEK", icao: "ZBAA", lat: 40.0801, lon: 116.5845 }, { city: "Bengaluru", country: "India", iata: "BLR", icao: "VOBL", lat: 13.1986, lon: 77.7063 }, { city: "Chennai", country: "India", iata: "MAA", icao: "VOMM", lat: 12.9941, lon: 80.1709 }, { city: "Chengdu", country: "China", iata: "CTU", icao: "ZUUU", lat: 30.5785, lon: 103.9485 }, { city: "Colombo", country: "Sri Lanka", iata: "CMB", icao: "VCBI", lat: 7.1802, lon: 79.8842 }, { city: "Dhaka", country: "Bangladesh", iata: "DAC", icao: "VGHS", lat: 23.8433, lon: 90.3978 }, { city: "Delhi", country: "India", iata: "DEL", icao: "VIDP", lat: 28.5562, lon: 77.1000 }, { city: "Gaya", country: "India", iata: "GAY", icao: "VEGY", lat: 24.7444, lon: 84.9511 }, { city: "Denpasar", country: "Indonesia", iata: "DPS", icao: "WADD", lat: -8.7482, lon: 115.1672 }, { city: "Fukuoka", country: "Japan", iata: "FUK", icao: "RJFF", lat: 33.5858, lon: 130.4505 }, { city: "Guangzhou", country: "China", iata: "CAN", icao: "ZGGG", lat: 23.3924, lon: 113.2988 }, { city: "Hanoi", country: "Vietnam", iata: "HAN", icao: "VVNB", lat: 21.2212, lon: 105.8072 }, { city: "Ho Chi Minh City", country: "Vietnam", iata: "SGN", icao: "VVTS", lat: 10.8222, lon: 106.6619 }, { city: "Hong Kong", country: "Hong Kong", iata: "HKG", icao: "VHHH", lat: 22.3080, lon: 113.9185 }, { city: "Hyderabad", country: "India", iata: "HYD", icao: "VOHS", lat: 17.2403, lon: 78.4294 }, { city: "Islamabad", country: "Pakistan", iata: "ISB", icao: "OPIS", lat: 33.5492, lon: 72.8256 }, { city: "Jakarta", country: "Indonesia", iata: "CGK", icao: "WIII", lat: -6.1256, lon: 106.6558 }, { city: "Karachi", country: "Pakistan", iata: "KHI", icao: "OPKC", lat: 24.9073, lon: 67.1608 }, { city: "Kathmandu", country: "Nepal", iata: "KTM", icao: "VNKT", lat: 27.6966, lon: 85.3591 }, { city: "Kaohsiung", country: "Taiwan", iata: "KHH", icao: "RCKH", lat: 22.5768, lon: 120.3499 }, { city: "Kochi", country: "India", iata: "COK", icao: "VOCI", lat: 10.1520, lon: 76.4019 }, { city: "Kolkata", country: "India", iata: "CCU", icao: "VECC", lat: 22.6547, lon: 88.4467 }, { city: "Kuala Lumpur", country: "Malaysia", iata: "KUL", icao: "WMKK", lat: 2.7456, lon: 101.7099 }, { city: "Kunming", country: "China", iata: "KMG", icao: "ZPPP", lat: 25.1019, lon: 102.928 }, { city: "Lahore", country: "Pakistan", iata: "LHE", icao: "OPLA", lat: 31.5216, lon: 74.4036 }, { city: "Manila", country: "Philippines", iata: "MNL", icao: "RPLL", lat: 14.5086, lon: 121.0194 }, { city: "Mumbai", country: "India", iata: "BOM", icao: "VABB", lat: 19.0896, lon: 72.8656 }, { city: "Nagoya", country: "Japan", iata: "NGO", icao: "RJGG", lat: 34.8584, lon: 136.8054 }, { city: "Osaka", country: "Japan", iata: "KIX", icao: "RJBB", lat: 34.4272, lon: 135.2442 }, { city: "Penang", country: "Malaysia", iata: "PEN", icao: "WMKP", lat: 5.2971, lon: 100.2766 }, { city: "Phnom Penh", country: "Cambodia", iata: "PNH", icao: "VDPP", lat: 11.5466, lon: 104.8441 }, { city: "Sapporo", country: "Japan", iata: "CTS", icao: "RJCC", lat: 42.7752, lon: 141.6923 }, { city: "Seoul", country: "South Korea", iata: "ICN", icao: "RKSI", lat: 37.4602, lon: 126.4407 }, { city: "Shanghai", country: "China", iata: "PVG", icao: "ZSPD", lat: 31.1444, lon: 121.8053 }, { city: "Siem Reap", country: "Cambodia", iata: "REP", icao: "VDSR", lat: 13.4107, lon: 103.8121 }, { city: "Singapore", country: "Singapore", iata: "SIN", icao: "WSSS", lat: 1.3644, lon: 103.9915 }, { city: "Taipei", country: "Taiwan", iata: "TPE", icao: "RCTP", lat: 25.0797, lon: 121.2345 }, { city: "Tokyo (Haneda)", country: "Japan", iata: "HND", icao: "RJTT", lat: 35.5494, lon: 139.7798 }, { city: "Tokyo (Narita)", country: "Japan", iata: "NRT", icao: "RJAA", lat: 35.7720, lon: 140.3863 }, { city: "Vientiane", country: "Laos", iata: "VTE", icao: "VLVT", lat: 17.9883, lon: 102.5633 }, { city: "Yangon", country: "Myanmar", iata: "RGN", icao: "VYYY", lat: 16.9073, lon: 96.1332 }, { city: "Brussels", country: "Belgium", iata: "BRU", icao: "EBBR", lat: 50.9014, lon: 4.4844 }, { city: "Copenhagen", country: "Denmark", iata: "CPH", icao: "EKCH", lat: 55.6180, lon: 12.6560 }, { city: "Frankfurt", country: "Germany", iata: "FRA", icao: "EDDF", lat: 50.0379, lon: 8.5622 }, { city: "Istanbul", country: "Turkey", iata: "IST", icao: "LTFM", lat: 41.2753, lon: 28.7519 }, { city: "London", country: "United Kingdom", iata: "LHR", icao: "EGLL", lat: 51.4700, lon: -0.4543 }, { city: "Melbourne", country: "Australia", iata: "MEL", icao: "YMML", lat: -37.6690, lon: 144.8410 }, { city: "Milan", country: "Italy", iata: "MXP", icao: "LIMC", lat: 45.6301, lon: 8.7285 }, { city: "Munich", country: "Germany", iata: "MUC", icao: "EDDM", lat: 48.3537, lon: 11.7861 }, { city: "Oslo", country: "Norway", iata: "OSL", icao: "ENGM", lat: 60.1976, lon: 11.1004 }, { city: "Paris", country: "France", iata: "CDG", icao: "LFPG", lat: 49.0097, lon: 2.5479 }, { city: "Perth", country: "Australia", iata: "PER", icao: "YPPH", lat: -31.9403, lon: 115.9672 }, { city: "Stockholm", country: "Sweden", iata: "ARN", icao: "ESSA", lat: 59.6498, lon: 17.9238 }, { city: "Sydney", country: "Australia", iata: "SYD", icao: "YSSY", lat: -33.9399, lon: 151.1753 }, { city: "Zurich", country: "Switzerland", iata: "ZRH", icao: "LSZH", lat: 47.4647, lon: 8.5492 }
         ];
 
-        // --- DOM Elements ---
-        const loadingScreen = document.getElementById('loading-screen');
-        const homeScreen = document.getElementById('home-screen');
-        const endScreen = document.getElementById('end-screen');
-        const gameUI = document.getElementById('game-ui');
-        const modeSelectButtons = document.querySelectorAll('.mode-select-button');
-        const restartButton = document.getElementById('restart-button');
-        const resetProgressButton = document.getElementById('reset-progress-button');
-        const backToHomeFromGameButton = document.getElementById('back-to-home-from-game');
-        const homeButtonFromEnd = document.getElementById('home-button-from-end');
-        const destinationPrompt = document.getElementById('destination-prompt');
-        const questionCounter = document.getElementById('question-counter');
-        const scoreCounter = document.getElementById('score-counter');
-        const finalScore = document.getElementById('final-score');
-        const feedbackBox = document.getElementById('feedback-box');
-        const feedbackText = document.getElementById('feedback-text');
-        const feedbackDetails = document.getElementById('feedback-details');
-        const nextButton = document.getElementById('next-button');
-        const masteryDisplay = document.getElementById('mastery-display');
-        const masteredCount = document.getElementById('mastered-count');
-        const userIdDisplay = document.getElementById('user-id-display');
-        const confirmModal = document.getElementById('confirm-modal');
-        const confirmYesButton = document.getElementById('confirm-yes-button');
-        const confirmNoButton = document.getElementById('confirm-no-button');
-        
-        // --- Game State ---
-        let map;
-        let score = 0;
-        let currentQuestionIndex = 0;
-        let shuffledDestinations = [];
-        let mapClickListener;
-        let guessMarker = null;
-        let answerMarker = null;
-        let lineToAnswer = null;
-        let practiceMarkers = [];
-        let destinationProgress = {};
-        let activeGameMode = null;
-        let isInitialLoad = true;
-        let onConfirmAction = null;
-        
-        // --- Firebase State ---
-        let auth, db, app;
-        let userId;
-        let progressUnsubscribe;
-
-        // --- Progress Tracking ---
-        function loadProgress(uid) {
+        function loadAirportProgress(uid) {
             userId = uid;
             const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
             const progressDocRef = doc(db, 'artifacts', appId, 'users', userId);
 
-            if (progressUnsubscribe) progressUnsubscribe();
-
-            progressUnsubscribe = onSnapshot(progressDocRef, (docSnap) => {
+            if (airportState.progressUnsubscribe) airportState.progressUnsubscribe();
+            airportState.progressUnsubscribe = onSnapshot(progressDocRef, (docSnap) => {
                 if (docSnap.exists()) {
-                    destinationProgress = docSnap.data().progress || {};
+                    airportState.destinationProgress = docSnap.data().progress || {};
                 } else {
-                    airwaysDestinations.forEach(dest => {
-                        destinationProgress[dest.city] = 0;
-                    });
-                    saveProgress(); 
+                    airwaysDestinations.forEach(dest => { airportState.destinationProgress[dest.city] = 0; });
+                    saveAirportProgress();
                 }
                 updateProgressSummary();
-                if (isInitialLoad) {
-                    loadingScreen.classList.add('hidden');
-                    showHomeScreen();
-                    isInitialLoad = false;
-                }
             });
         }
-
-        async function saveProgress() {
+        async function saveAirportProgress() {
             if (!userId) return;
             const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
             const progressDocRef = doc(db, 'artifacts', appId, 'users', userId);
-            try {
-                await setDoc(progressDocRef, { progress: destinationProgress }, { merge: true });
-            } catch (error) {
-                console.error("Error saving progress: ", error);
+            try { await setDoc(progressDocRef, { progress: airportState.destinationProgress }, { merge: true });
+            } catch (error) { console.error("Error saving progress: ", error); }
+        }
+        async function resetAirportProgress() {
+            showConfirmModal('Reset Progress?', 'Are you sure you want to reset all airport progress?', async () => {
+                airwaysDestinations.forEach(dest => { airportState.destinationProgress[dest.city] = 0; });
+                await saveAirportProgress();
+                airportDOM.endScreen.classList.add('hidden');
+                showAirportHomeScreen();
+            });
+        }
+        function updateProgressSummary() {
+            const mastered = Object.values(airportState.destinationProgress).filter(level => level >= 3).length;
+            airportDOM.masteredCount.textContent = mastered;
+        }
+        function getMasteryStars(city) {
+            const level = airportState.destinationProgress[city] || 0;
+            if (level >= 3) return '<span class="mastery-star">★★★</span>';
+            if (level === 2) return '<span class="mastery-star">★★</span><span class="mastery-star-empty">☆</span>';
+            if (level === 1) return '<span class="mastery-star">★</span><span class="mastery-star-empty">☆☆</span>';
+            return '<span class="mastery-star-empty">☆☆☆</span>';
+        }
+        function initMap() {
+            if (airportState.map) return;
+            airportState.map = L.map('map', { center: [20, 100], zoom: 3, minZoom: 2, maxBounds: [[-90, -180], [90, 180]], worldCopyJump: true });
+            L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager_nolabels/{z}/{x}/{y}{r}.png', {
+                attribution: '&copy; OpenStreetMap contributors &copy; CARTO',
+            }).addTo(airportState.map);
+        }
+        function showAirportHomeScreen() {
+            airportDOM.homeScreen.classList.remove('hidden');
+            airportDOM.gameUI.classList.add('hidden');
+            airportDOM.endScreen.classList.add('hidden');
+            airportDOM.feedbackBox.classList.add('hidden');
+            clearMapLayers();
+            updateProgressSummary();
+        }
+        function startAirportGame(mode) {
+            airportState.activeGameMode = mode;
+            airportDOM.homeScreen.classList.add('hidden');
+            if (mode === 'practice') {
+                startPracticeMode();
+                return;
             }
+            airportDOM.gameUI.classList.remove('hidden');
+            airportState.score = 0;
+            airportState.currentQuestionIndex = 0;
+            updateScoreDisplay();
+            airportState.shuffledDestinations = [...airwaysDestinations].sort(() => Math.random() - 0.5);
+            nextAirportQuestion();
+        }
+        function startPracticeMode() {
+            airportDOM.gameUI.classList.remove('hidden');
+            airportDOM.destinationPrompt.textContent = "Practice Mode";
+            airportDOM.masteryDisplay.innerHTML = "";
+            airportDOM.questionCounter.textContent = "Explore";
+            airportDOM.scoreCounter.textContent = "-";
+            airwaysDestinations.forEach(dest => {
+                const marker = L.marker([dest.lat, dest.lon], { icon: L.divIcon({ className: 'practice-marker', iconSize: [12, 12] }) }).addTo(airportState.map);
+                marker.bindPopup(`<b>${dest.city}, ${dest.country}</b><br>IATA: ${dest.iata} | ICAO: ${dest.icao}<br>Mastery: ${getMasteryStars(dest.city)}`);
+                airportState.practiceMarkers.push(marker);
+            });
+        }
+        function handleMapClick(e) {
+            airportState.map.off('click', airportState.mapClickListener);
+            const userLatLng = e.latlng;
+            const correctDestination = airportState.shuffledDestinations[airportState.currentQuestionIndex];
+            const correctLatLng = L.latLng(correctDestination.lat, correctDestination.lon);
+            const distance = calculateDistance(userLatLng.lat, userLatLng.lng, correctLatLng.lat, correctLatLng.lng);
+            airportState.guessMarker = L.marker(userLatLng, { icon: L.divIcon({ className: 'user-guess-icon', iconSize: [12, 12] }) }).addTo(airportState.map);
+            airportState.answerMarker = L.marker(correctLatLng, { icon: L.divIcon({ className: 'correct-answer-icon', iconSize: [12, 12] }) }).addTo(airportState.map).bindPopup(`<b>${correctDestination.city} (${correctDestination.iata})</b>`).openPopup();
+            airportState.lineToAnswer = L.polyline([userLatLng, correctLatLng], { color: '#4f008c', weight: 2, dashArray: '5, 5' }).addTo(airportState.map);
+            airportState.map.fitBounds(L.latLngBounds(userLatLng, correctLatLng), { padding: [70, 70] });
+            showAirportFeedback(distance <= 150, `You were ${Math.round(distance)} km away.`);
+        }
+        function nextAirportQuestion() {
+            clearMapLayers();
+            airportDOM.feedbackBox.classList.add('hidden');
+            if (airportState.currentQuestionIndex >= airportState.shuffledDestinations.length) {
+                endAirportGame();
+                return;
+            }
+            updateQuestionDisplay();
+            airportState.mapClickListener = airportState.map.on('click', handleMapClick);
+        }
+        function showAirportFeedback(isCorrect, detailsText) {
+            const correctDestination = airportState.shuffledDestinations[airportState.currentQuestionIndex];
+            if (isCorrect) {
+                airportState.score++;
+                updateScoreDisplay();
+                airportDOM.feedbackText.textContent = "Excellent! Correct!";
+                airportDOM.feedbackText.className = 'text-xl font-semibold mb-4 text-green-600';
+                airportState.destinationProgress[correctDestination.city] = (airportState.destinationProgress[correctDestination.city] || 0) + 1;
+                saveAirportProgress();
+            } else {
+                airportDOM.feedbackText.textContent = `Not quite! This is ${correctDestination.city}.`;
+                airportDOM.feedbackText.className = 'text-xl font-semibold mb-4 text-red-600';
+            }
+            airportDOM.feedbackDetails.innerHTML = `${detailsText}<br><b>${correctDestination.iata} | ${correctDestination.icao}</b>`;
+            airportDOM.feedbackBox.classList.remove('hidden');
+            airportState.currentQuestionIndex++;
+        }
+        function endAirportGame() {
+            airportDOM.gameUI.classList.add('hidden');
+            airportDOM.feedbackBox.classList.add('hidden');
+            airportDOM.finalScore.textContent = `${airportState.score} / ${airportState.shuffledDestinations.length}`;
+            airportDOM.endScreen.classList.remove('hidden');
+        }
+        function clearMapLayers() {
+            if(!airportState.map) return;
+            if (airportState.guessMarker) airportState.map.removeLayer(airportState.guessMarker);
+            if (airportState.answerMarker) airportState.map.removeLayer(airportState.answerMarker);
+            if (airportState.lineToAnswer) airportState.map.removeLayer(airportState.lineToAnswer);
+            airportState.practiceMarkers.forEach(marker => airportState.map.removeLayer(marker));
+            airportState.practiceMarkers = [];
+            airportState.map.closePopup();
+            airportState.guessMarker = null; airportState.answerMarker = null; airportState.lineToAnswer = null;
+        }
+        function updateScoreDisplay() { airportDOM.scoreCounter.textContent = airportState.score; }
+        function updateQuestionDisplay() {
+            const currentDestination = airportState.shuffledDestinations[airportState.currentQuestionIndex];
+            airportDOM.destinationPrompt.textContent = airportState.activeGameMode === 'guessLocationName' 
+                ? `${currentDestination.city}, ${currentDestination.country}` 
+                : `${currentDestination.iata} / ${currentDestination.icao}`;
+            airportDOM.questionCounter.textContent = `${airportState.currentQuestionIndex + 1} / ${airportState.shuffledDestinations.length}`;
+            airportDOM.masteryDisplay.innerHTML = getMasteryStars(currentDestination.city);
+        }
+        function calculateDistance(lat1, lon1, lat2, lon2) {
+            const R = 6371;
+            const dLat = (lat2 - lat1) * Math.PI / 180, dLon = (lon2 - lon1) * Math.PI / 180;
+            const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLon / 2) * Math.sin(dLon / 2);
+            return R * (2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)));
         }
 
-        async function resetProgress() {
-            showConfirmModal(
-                'Reset Progress?',
-                'Are you sure you want to reset all your progress? This cannot be undone.',
-                async () => {
-                    airwaysDestinations.forEach(dest => {
-                        destinationProgress[dest.city] = 0;
-                    });
-                    await saveProgress();
-                    endScreen.classList.add('hidden');
-                    showHomeScreen();
-                }
-            );
-        }
+        airportDOM.modeSelectButtons.forEach(button => button.addEventListener('click', (e) => startAirportGame(e.currentTarget.dataset.mode)));
+        airportDOM.backToAirportHome.addEventListener('click', showAirportHomeScreen);
+        airportDOM.airportHomeFromEnd.addEventListener('click', showAirportHomeScreen);
+        airportDOM.nextButton.addEventListener('click', nextAirportQuestion);
+        airportDOM.restartButton.addEventListener('click', () => {
+            airportDOM.endScreen.classList.add('hidden');
+            startAirportGame(airportState.activeGameMode);
+        });
+        airportDOM.resetProgressButton.addEventListener('click', resetAirportProgress);
+        airportDOM.backToMainMenu.addEventListener('click', showMainMenu);
 
+        // =================================================================
+        // ::: GENERAL APP LOGIC :::
+        // =================================================================
+        function showMainMenu() {
+            homeScreen.classList.remove('hidden');
+            airportGameContainer.classList.add('hidden');
+            approxGameContainer.classList.add('hidden');
+        }
+        
         function showConfirmModal(title, text, onConfirm) {
             document.getElementById('confirm-title').textContent = title;
             document.getElementById('confirm-text').textContent = text;
             onConfirmAction = onConfirm;
             confirmModal.classList.remove('hidden');
         }
-
-        function updateProgressSummary() {
-            const mastered = Object.values(destinationProgress).filter(level => level >= 3).length;
-            masteredCount.textContent = mastered;
-        }
-
-        function getMasteryStars(city) {
-            const level = destinationProgress[city] || 0;
-            if (level >= 3) return '<span class="mastery-star">★★★</span>';
-            if (level === 2) return '<span class="mastery-star">★★</span><span class="mastery-star-empty">☆</span>';
-            if (level === 1) return '<span class="mastery-star">★</span><span class="mastery-star-empty">☆☆</span>';
-            return '<span class="mastery-star-empty">☆☆☆</span>';
-        }
-
-        // --- Map & Game Logic ---
-        function initMap() {
-            if (map) return;
-            map = L.map('map', { center: [20, 100], zoom: 3, minZoom: 2, maxBounds: [[-90, -180], [90, 180]], worldCopyJump: true });
-            L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager_nolabels/{z}/{x}/{y}{r}.png', {
-                attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
-            }).addTo(map);
-        }
-
-        function showHomeScreen() {
-            homeScreen.classList.remove('hidden');
-            gameUI.classList.add('hidden');
-            endScreen.classList.add('hidden');
-            feedbackBox.classList.add('hidden');
-            clearMapLayers();
-            updateProgressSummary();
-        }
-
-        function startGame(mode) {
-            activeGameMode = mode;
+        
+        selectAirportGame.addEventListener('click', () => {
             homeScreen.classList.add('hidden');
-            if (mode === 'practice') {
-                startPracticeMode();
-                return;
-            }
-            gameUI.classList.remove('hidden');
-            score = 0;
-            currentQuestionIndex = 0;
-            updateScoreDisplay();
-            shuffledDestinations = [...airwaysDestinations].sort(() => Math.random() - 0.5);
-            nextQuestion();
-        }
-
-        function startPracticeMode() {
-            gameUI.classList.remove('hidden');
-            destinationPrompt.textContent = "Practice Mode";
-            masteryDisplay.innerHTML = "";
-            questionCounter.textContent = "Explore";
-            scoreCounter.textContent = "-";
-            airwaysDestinations.forEach(dest => {
-                const marker = L.marker([dest.lat, dest.lon], { icon: L.divIcon({ className: 'practice-marker', iconSize: [12, 12] }) }).addTo(map);
-                const popupContent = `<b>${dest.city}, ${dest.country}</b><br>IATA: ${dest.iata} | ICAO: ${dest.icao}<br>Mastery: ${getMasteryStars(dest.city)}`;
-                marker.bindPopup(popupContent);
-                practiceMarkers.push(marker);
-            });
-        }
-        
-        function handleMapClick(e) {
-            map.off('click', mapClickListener);
-            const userLatLng = e.latlng;
-            const correctDestination = shuffledDestinations[currentQuestionIndex];
-            const correctLatLng = L.latLng(correctDestination.lat, correctDestination.lon);
-            const distance = calculateDistance(userLatLng.lat, userLatLng.lng, correctLatLng.lat, correctLatLng.lng);
-            guessMarker = L.marker(userLatLng, { icon: L.divIcon({ className: 'user-guess-icon', iconSize: [12, 12] }) }).addTo(map);
-            answerMarker = L.marker(correctLatLng, { icon: L.divIcon({ className: 'correct-answer-icon', iconSize: [12, 12] }) }).addTo(map).bindPopup(`<b>${correctDestination.city} (${correctDestination.iata})</b>`).openPopup();
-            lineToAnswer = L.polyline([userLatLng, correctLatLng], { color: '#4f008c', weight: 2, dashArray: '5, 5' }).addTo(map);
-            map.fitBounds(L.latLngBounds(userLatLng, correctLatLng), { padding: [70, 70] });
-            const isCorrect = distance <= 150;
-            showFeedback(isCorrect, `You were ${Math.round(distance)} km away.`);
-        }
-        
-        function nextQuestion() {
-            clearMapLayers();
-            feedbackBox.classList.add('hidden');
-            if (currentQuestionIndex >= shuffledDestinations.length) {
-                endGame();
-                return;
-            }
-            updateQuestionDisplay();
-            mapClickListener = map.on('click', handleMapClick);
-        }
-
-        function showFeedback(isCorrect, detailsText) {
-            const correctDestination = shuffledDestinations[currentQuestionIndex];
-            if (isCorrect) {
-                score++;
-                updateScoreDisplay();
-                feedbackText.textContent = "Excellent! You are correct!";
-                feedbackText.classList.remove('text-red-600');
-                feedbackText.classList.add('text-green-600');
-                destinationProgress[correctDestination.city] = (destinationProgress[correctDestination.city] || 0) + 1;
-                saveProgress();
-            } else {
-                feedbackText.textContent = `Not quite! The correct location was ${correctDestination.city}.`;
-                feedbackText.classList.remove('text-green-600');
-                feedbackText.classList.add('text-red-600');
-            }
-            feedbackDetails.innerHTML = `${detailsText}<br><b>${correctDestination.iata} | ${correctDestination.icao}</b>`;
-            feedbackBox.classList.remove('hidden');
-            currentQuestionIndex++;
-        }
-        
-        function endGame() {
-            gameUI.classList.add('hidden');
-            feedbackBox.classList.add('hidden');
-            finalScore.textContent = `${score} / ${shuffledDestinations.length}`;
-            endScreen.classList.remove('hidden');
-        }
-
-        function clearMapLayers() {
-            if (guessMarker) map.removeLayer(guessMarker);
-            if (answerMarker) map.removeLayer(answerMarker);
-            if (lineToAnswer) map.removeLayer(lineToAnswer);
-            practiceMarkers.forEach(marker => map.removeLayer(marker));
-            practiceMarkers = [];
-            if(map) map.closePopup();
-            guessMarker = null;
-            answerMarker = null;
-            lineToAnswer = null;
-        }
-
-        function updateScoreDisplay() { scoreCounter.textContent = score; }
-
-        function updateQuestionDisplay() {
-             const currentDestination = shuffledDestinations[currentQuestionIndex];
-             let promptText;
-             if (activeGameMode === 'guessLocationName') {
-                 promptText = `${currentDestination.city}, ${currentDestination.country}`;
-             } else {
-                 promptText = `${currentDestination.iata} / ${currentDestination.icao}`;
-             }
-             destinationPrompt.textContent = promptText;
-             questionCounter.textContent = `${currentQuestionIndex + 1} / ${shuffledDestinations.length}`;
-             masteryDisplay.innerHTML = getMasteryStars(currentDestination.city);
-        }
-
-        function calculateDistance(lat1, lon1, lat2, lon2) {
-            const R = 6371;
-            const dLat = (lat2 - lat1) * Math.PI / 180;
-            const dLon = (lon2 - lon1) * Math.PI / 180;
-            const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLon / 2) * Math.sin(dLon / 2);
-            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-            return R * c;
-        }
-
-        // --- Event Listeners ---
-        modeSelectButtons.forEach(button => {
-            button.addEventListener('click', (e) => startGame(e.currentTarget.dataset.mode));
-        });
-        backToHomeFromGameButton.addEventListener('click', showHomeScreen);
-        homeButtonFromEnd.addEventListener('click', showHomeScreen);
-        nextButton.addEventListener('click', nextQuestion);
-        restartButton.addEventListener('click', () => {
-            endScreen.classList.add('hidden');
-            startGame(activeGameMode);
-        });
-        resetProgressButton.addEventListener('click', resetProgress);
-        
-        confirmNoButton.addEventListener('click', () => {
-            confirmModal.classList.add('hidden');
-            onConfirmAction = null;
+            airportGameContainer.classList.remove('hidden');
+            showAirportHomeScreen();
         });
 
-        confirmYesButton.addEventListener('click', () => {
-            if (onConfirmAction) {
-                onConfirmAction();
-            }
-            confirmModal.classList.add('hidden');
-            onConfirmAction = null;
+        selectApproxGame.addEventListener('click', () => {
+            homeScreen.classList.add('hidden');
+            approxGameContainer.classList.remove('hidden');
+            approxDOM.homeScreen.classList.remove('hidden');
+            approxDOM.gameUI.classList.add('hidden');
         });
-        
+
         // --- App Initialization ---
-        document.addEventListener('DOMContentLoaded', () => {
+        window.onload = () => {
             initMap();
             
-             // NOTE: Replace this with your actual Firebase config object if running locally
             const firebaseConfig = {
-                                      apiKey: "AIzaSyD4v0iN7y1C9GEDYhgyxv2koaJCUxjtnqg",
-                                      authDomain: "airport-qui.firebaseapp.com",
-                                      projectId: "airport-qui",
-                                      storageBucket: "airport-qui.firebasestorage.app",
-                                      messagingSenderId: "66527997631",
-                                      appId: "1:66527997631:web:942a882fb564ac8e78600a",
-                                      measurementId: "G-J8QFJLJWMP"
-                                    };
+                  apiKey: "AIzaSyD4v0iN7y1C9GEDYhgyxv2koaJCUxjtnqg",
+                  authDomain: "airport-qui.firebaseapp.com",
+                  projectId: "airport-qui",
+                  storageBucket: "airport-qui.firebasestorage.app",
+                  messagingSenderId: "66527997631",
+                  appId: "1:66527997631:web:942a882fb564ac8e78600a",
+                  measurementId: "G-J8QFJLJWMP"
+                };
 
-            if (!firebaseConfig || !firebaseConfig.projectId) {
-                console.error("Firebase config not found! This app will not work outside the intended environment without your own Firebase config.");
-                loadingScreen.innerHTML = "<h1>Connection Error</h1><p class='text-sm'>A Firebase configuration is required.</p>";
-                return;
+            if (!firebaseConfig || !firebaseConfig.projectId || firebaseConfig.apiKey === "YOUR_API_KEY") {
+                 console.warn("Using offline mode. Progress will not be saved.");
+                 loadingScreen.classList.add('hidden');
+                 showMainMenu();
+                 isInitialLoad = false;
+                 userIdDisplay.textContent = 'offline-user';
+                 airwaysDestinations.forEach(dest => { airportState.destinationProgress[dest.city] = 0; });
+                 updateProgressSummary();
+                 return;
             }
             
             app = initializeApp(firebaseConfig);
@@ -436,22 +691,31 @@
             onAuthStateChanged(auth, async (user) => {
                 if (user) {
                     userIdDisplay.textContent = user.uid;
-                    loadProgress(user.uid);
+                    loadAirportProgress(user.uid);
+                    if (isInitialLoad) {
+                        loadingScreen.classList.add('hidden');
+                        showMainMenu();
+                        isInitialLoad = false;
+                    }
                 } else {
-                    try {
-                        const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
-                        if (initialAuthToken) {
-                            await signInWithCustomToken(auth, initialAuthToken);
-                        } else {
-                            await signInAnonymously(auth);
-                        }
-                    } catch (error) {
+                    try { await signInAnonymously(auth); } 
+                    catch (error) {
                         console.error("Authentication failed: ", error);
                         loadingScreen.innerHTML = "<h1>Authentication Failed</h1>";
                     }
                 }
             });
-        });
+
+            confirmNoButton.addEventListener('click', () => {
+                 confirmModal.classList.add('hidden');
+                 onConfirmAction = null;
+            });
+            confirmYesButton.addEventListener('click', () => {
+                if (onConfirmAction) onConfirmAction();
+                confirmModal.classList.add('hidden');
+                onConfirmAction = null;
+            });
+        };
     </script>
 </body>
 </html>
