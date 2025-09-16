@@ -22,10 +22,9 @@
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css" xintegrity="sha384-n8MVd4RsNIU0KOVEMckDpbRei4iuOorsMa2xz/bCaVXSwnsoDhevrVoQfxn6MVqd" crossorigin="anonymous">
     <script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js" xintegrity="sha384-XjKyOOlVwcjNcsNQpWgfdTAnMGTNXEhsRRCggSFrFXgNmjS2JkGx8o7gKjV2jHrv" crossorigin="anonymous"></script>
 
-
     <style>
-        body { font-family: 'Inter', sans-serif; touch-action: none; }
-        .screen-overlay { position: absolute; inset: 0; background-color: rgba(0,0,0,0.85); display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; color: white; padding: 2rem; z-index: 30; }
+        body { font-family: 'Inter', sans-serif; touch-action: manipulation; }
+        .screen-overlay { position: absolute; inset: 0; background-color: rgba(26, 32, 44, 0.95); display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; color: white; padding: 2rem; z-index: 30; }
         
         /* --- Airport Game Specific Styles --- */
         #map { height: 100vh; width: 100vw; z-index: 10; background-color: #a2d1f7; }
@@ -44,8 +43,15 @@
         .approx-option:hover { background-color: #4a5568; transform: translateY(-2px); }
         .correct-option { background-color: #2f855a !important; color: white; }
         .incorrect-option { background-color: #c53030 !important; color: white; }
-        /* KaTeX font size adjustment */
         .katex-display { font-size: 2.25rem; }
+
+        /* --- 3D Cube Puzzle Styles --- */
+        #cube-game-container { background-color: #111827; color: #f3f4f6; }
+        .cube-viewer { cursor: grab; background-color: #1f2937; border-radius: 0.5rem; }
+        .challenge-mode .cube-viewer { cursor: default; }
+        .cube-choice-card { transition: transform 0.2s, border-color 0.2s, box-shadow 0.2s; }
+        .cube-choice-card:hover { border-color: #3b82f6; transform: translateY(-4px); }
+        .selected-choice { border-color: #3b82f6; box-shadow: 0 0 15px rgba(59, 130, 246, 0.5); }
     </style>
 </head>
 <body class="bg-gray-800 overflow-hidden">
@@ -53,7 +59,7 @@
     <div id="game-container" class="relative w-screen h-screen">
         <!-- Shared Elements -->
         <div id="loading-screen" class="screen-overlay"><h1 class="text-4xl font-bold">Connecting...</h1></div>
-        <div id="confirm-modal" class="screen-overlay hidden">
+        <div id="confirm-modal" class="screen-overlay hidden bg-black/80">
              <div class="bg-white text-black p-8 rounded-lg shadow-xl max-w-sm text-center">
                  <h2 id="confirm-title" class="text-2xl font-bold mb-4">Reset Progress?</h2>
                  <p id="confirm-text" class="mb-6">Are you sure?</p>
@@ -68,14 +74,19 @@
         <div id="home-screen" class="screen-overlay hidden">
             <h1 class="text-4xl md:text-6xl font-extrabold mb-4 text-purple-300">Game Challenge</h1>
             <p class="text-lg md:text-xl mb-8 max-w-2xl">Select a game to begin.</p>
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-4xl w-full">
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-6xl w-full">
+                <!-- Selectors -->
                 <div id="select-airport-game" class="cursor-pointer bg-gray-900/50 p-6 rounded-lg border-2 border-transparent hover:border-purple-500 transition-all">
                     <h2 class="text-3xl font-bold mb-2 text-purple-400">Airport Challenge</h2>
-                    <p class="text-gray-300">Master Thai Airways routes by finding destinations on the map.</p>
+                    <p class="text-gray-300">Find Thai Airways destinations on an interactive map.</p>
                 </div>
                 <div id="select-approx-game" class="cursor-pointer bg-gray-900/50 p-6 rounded-lg border-2 border-transparent hover:border-teal-500 transition-all">
                     <h2 class="text-3xl font-bold mb-2 text-teal-400">Approximation Quiz</h2>
-                    <p class="text-gray-300">Test your mental math skills with rapid-fire approximation problems.</p>
+                    <p class="text-gray-300">Test your mental math skills with rapid-fire problems.</p>
+                </div>
+                <div id="select-cube-game" class="cursor-pointer bg-gray-900/50 p-6 rounded-lg border-2 border-transparent hover:border-blue-500 transition-all">
+                    <h2 class="text-3xl font-bold mb-2 text-blue-400">3D Cube Puzzle</h2>
+                    <p class="text-gray-300">Visualize and assemble a 3x3x3 cube from its parts.</p>
                 </div>
             </div>
              <div class="mt-8 text-xs bg-black/30 p-2 rounded-lg">User ID: <span id="user-id-display"></span></div>
@@ -99,7 +110,7 @@
             <div id="airport-game-ui" class="absolute top-0 left-0 w-full p-4 md:p-6 z-20 hidden pointer-events-none">
                 <div class="max-w-7xl mx-auto flex justify-between items-center bg-white/80 backdrop-blur-sm p-4 rounded-xl shadow-lg pointer-events-auto">
                     <button id="back-to-airport-home" class="bg-gray-400 hover:bg-gray-500 text-white font-bold p-2 rounded-full mr-4">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1V10a1 1 0 00-1-1H7a1 1 0 00-1 1v10a1 1 0 001 1h2z" /></svg>
+                         <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1V10a1 1 0 00-1-1H7a1 1 0 00-1 1v10a1 1 0 001 1h2z" /></svg>
                     </button>
                     <div class="flex-1">
                         <p class="text-sm font-medium text-gray-500">Find this destination:</p>
@@ -172,9 +183,9 @@
                 <div id="approx-feedback" class="hidden mt-6 bg-gray-900/50 p-6 rounded-lg">
                      <h3 id="feedback-title" class="text-2xl font-bold mb-3"></h3>
                      <div id="answer-key" class="text-left">
-                        <p class="font-semibold text-teal-300">The Trick (How to Estimate):</p>
-                        <p id="answer-key-trick" class="font-mono bg-black/30 p-3 rounded-md"></p>
-                        <p class="mt-2 text-gray-400">The exact answer is <b id="exact-answer" class="text-white"></b>.</p>
+                         <p class="font-semibold text-teal-300">The Trick (How to Estimate):</p>
+                         <p id="answer-key-trick" class="font-mono bg-black/30 p-3 rounded-md"></p>
+                         <p class="mt-2 text-gray-400">The exact answer is <b id="exact-answer" class="text-white"></b>.</p>
                      </div>
                      <button id="approx-next-btn" class="w-full mt-4 bg-teal-600 hover:bg-teal-700 text-white font-bold py-3 rounded-lg text-lg">Next Question</button>
                 </div>
@@ -189,6 +200,69 @@
                      <button id="approx-restart-button" class="bg-teal-600 hover:bg-teal-700 text-white font-bold py-3 px-8 rounded-lg text-xl">Play Again</button>
                      <button id="approx-home-button" class="bg-gray-500 hover:bg-gray-600 text-white font-bold py-3 px-8 rounded-lg text-xl">Main Menu</button>
                  </div>
+            </div>
+        </div>
+
+        <!-- 3D Cube Puzzle Game -->
+        <div id="cube-game-container" class="w-full h-full flex-col hidden overflow-hidden">
+            <div id="cube-home-screen" class="screen-overlay">
+                <h1 class="text-4xl md:text-6xl font-extrabold mb-4 text-blue-300">3D Cube Puzzle</h1>
+                <p class="text-lg md:text-xl mb-8 max-w-2xl">Choose your challenge level.</p>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <button id="cube-standard-mode-btn" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-4 px-8 rounded-lg text-xl shadow-lg">Standard Mode</button>
+                    <button id="cube-challenge-mode-btn" class="bg-orange-600 hover:bg-orange-700 text-white font-bold py-4 px-8 rounded-lg text-xl shadow-lg">Challenge Mode</button>
+                </div>
+                <button id="cube-back-to-main-menu-from-home" class="mt-8 bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded-lg">Back to Main Menu</button>
+            </div>
+
+            <div id="cube-game-ui" class="w-full h-full flex-col p-4 md:p-6 overflow-y-auto hidden">
+                <header class="text-center mb-4">
+                    <div class="flex items-center justify-between relative mb-2 w-full max-w-5xl mx-auto">
+                        <button id="cube-back-to-home" class="bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded-lg">Modes</button>
+                        <div class="text-center">
+                           <h1 id="cube-problem-counter" class="text-2xl font-bold text-blue-300">Problem 1 / 15</h1>
+                        </div>
+                        <div id="cube-timer" class="text-2xl font-bold text-yellow-400 bg-gray-900/50 px-4 py-2 rounded-lg">07:00</div>
+                    </div>
+                    <p class="text-gray-400 max-w-3xl mx-auto text-sm md:text-base">Assemble the cube by choosing the correct missing part.</p>
+                </header>
+
+                <main class="flex-grow flex flex-col items-center">
+                    <div class="w-full flex flex-col md:flex-row justify-center items-center gap-4 md:gap-8 mb-4">
+                        <div class="text-center">
+                            <h2 class="text-lg font-bold mb-2">Given Part 1 (White)</h2>
+                            <canvas id="cube-viewer-part1" class="viewer cube-viewer w-[280px] h-[280px] md:w-[320px] md:h-[320px]"></canvas>
+                        </div>
+                        <div class="text-center">
+                            <h2 class="text-lg font-bold mb-2">Given Part 2 (Red)</h2>
+                            <canvas id="cube-viewer-part2" class="viewer cube-viewer w-[280px] h-[280px] md:w-[320px] md:h-[320px]"></canvas>
+                        </div>
+                    </div>
+
+                    <h2 class="text-lg font-bold my-2">Select the missing part (Green):</h2>
+                    <div id="cube-choices-container" class="w-full max-w-5xl grid grid-cols-2 md:grid-cols-4 gap-4"></div>
+                    
+                    <div id="cube-navigation" class="w-full max-w-5xl mt-6 flex justify-between">
+                        <button id="cube-prev-btn" class="bg-gray-500 hover:bg-gray-600 text-white font-bold py-3 px-8 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed">Previous</button>
+                        <button id="cube-next-btn" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-8 rounded-lg">Next</button>
+                    </div>
+                </main>
+            </div>
+            
+            <div id="cube-end-screen" class="screen-overlay hidden">
+                <div class="bg-gray-800 p-8 rounded-xl shadow-2xl w-full max-w-7xl h-[90vh] flex flex-col">
+                    <div class="text-center mb-4">
+                        <h1 class="text-5xl font-extrabold text-blue-300">Test Complete!</h1>
+                        <p class="text-3xl font-bold mt-2">Final Score: <span id="cube-final-score" class="text-green-400"></span></p>
+                    </div>
+                    <div id="answer-key-container" class="flex-grow bg-gray-900/50 rounded-lg p-4 overflow-y-auto">
+                        <!-- Answer key will be generated here -->
+                    </div>
+                    <div class="mt-6 flex justify-center gap-4">
+                        <button id="cube-restart-btn" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-6 rounded-lg">Play Again</button>
+                        <button id="cube-end-home-btn" class="bg-gray-600 hover:bg-gray-700 text-white font-bold py-3 px-6 rounded-lg">Game Modes</button>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
@@ -214,10 +288,12 @@
         // --- Game Containers ---
         const airportGameContainer = document.getElementById('airport-game-container');
         const approxGameContainer = document.getElementById('approx-game-container');
+        const cubeGameContainer = document.getElementById('cube-game-container');
         
         // --- Game Selectors ---
         const selectAirportGame = document.getElementById('select-airport-game');
         const selectApproxGame = document.getElementById('select-approx-game');
+        const selectCubeGame = document.getElementById('select-cube-game');
 
         // =================================================================
         // ::: APPROXIMATION QUIZ LOGIC :::
@@ -249,12 +325,8 @@
         };
 
         const approxState = {
-            questions: [],
-            currentQIndex: 0,
-            correctAnswers: 0,
-            timer: null,
-            timeLeft: 0,
-            activeMode: 'practice', // 'practice' or 'test'
+            questions: [], currentQIndex: 0, correctAnswers: 0,
+            timer: null, timeLeft: 0, activeMode: 'practice',
         };
 
         const approxQuestions = [
@@ -317,11 +389,8 @@
         }
 
         function displayApproxQuestion() {
-            if (approxState.activeMode === 'test' && approxState.currentQIndex >= 20) {
-                endApproxGame();
-                return;
-            }
-            if (approxState.activeMode === 'practice' && approxState.currentQIndex >= approxState.questions.length) {
+            if ( (approxState.activeMode === 'test' && approxState.currentQIndex >= 20) ||
+                 (approxState.activeMode === 'practice' && approxState.currentQIndex >= approxState.questions.length) ) {
                 endApproxGame();
                 return;
             }
@@ -342,11 +411,7 @@
                 approxDOM.options.appendChild(button);
             });
             
-            if (approxState.activeMode === 'test') {
-                approxDOM.questionCounter.textContent = `Question ${approxState.currentQIndex + 1} of 20`;
-            } else {
-                approxDOM.questionCounter.textContent = `Question ${approxState.currentQIndex + 1}`;
-            }
+            approxDOM.questionCounter.textContent = `Question ${approxState.currentQIndex + 1}${approxState.activeMode === 'test' ? ' of 20' : ''}`;
         }
 
         function formatTime(seconds) {
@@ -370,9 +435,7 @@
         }
 
         function selectApproxAnswer(selectedButton, isCorrect) {
-            if (isCorrect) {
-                approxState.correctAnswers++;
-            }
+            if (isCorrect) approxState.correctAnswers++;
 
             if (approxState.activeMode === 'practice') {
                 const q = approxState.questions[approxState.currentQIndex];
@@ -447,18 +510,11 @@
         };
         
         const airportState = {
-            map: null,
-            score: 0,
-            currentQuestionIndex: 0,
-            shuffledDestinations: [],
-            mapClickListener: null,
-            guessMarker: null,
-            answerMarker: null,
-            lineToAnswer: null,
-            practiceMarkers: [],
-            destinationProgress: {},
-            activeGameMode: null,
-            progressUnsubscribe: null,
+            map: null, score: 0, currentQuestionIndex: 0,
+            shuffledDestinations: [], mapClickListener: null,
+            guessMarker: null, answerMarker: null, lineToAnswer: null,
+            practiceMarkers: [], destinationProgress: {},
+            activeGameMode: null, progressUnsubscribe: null,
         };
 
         const airwaysDestinations = [
@@ -637,6 +693,7 @@
             homeScreen.classList.remove('hidden');
             airportGameContainer.classList.add('hidden');
             approxGameContainer.classList.add('hidden');
+            cubeGameContainer.classList.add('hidden');
         }
         
         function showConfirmModal(title, text, onConfirm) {
@@ -659,10 +716,389 @@
             approxDOM.gameUI.classList.add('hidden');
         });
 
+        selectCubeGame.addEventListener('click', () => {
+            homeScreen.classList.add('hidden');
+            cubeGameContainer.classList.remove('hidden');
+            showCubeHomeScreen();
+        });
+
+        // =================================================================
+        // ::: 3D CUBE PUZZLE LOGIC :::
+        // =================================================================
+        const cubeDOM = {
+            homeScreen: document.getElementById('cube-home-screen'),
+            gameUI: document.getElementById('cube-game-ui'),
+            standardModeBtn: document.getElementById('cube-standard-mode-btn'),
+            challengeModeBtn: document.getElementById('cube-challenge-mode-btn'),
+            backToMenuFromHomeBtn: document.getElementById('cube-back-to-main-menu-from-home'),
+            backToHomeBtn: document.getElementById('cube-back-to-home'),
+            problemCounter: document.getElementById('cube-problem-counter'),
+            timer: document.getElementById('cube-timer'),
+            choicesContainer: document.getElementById('cube-choices-container'),
+            prevBtn: document.getElementById('cube-prev-btn'),
+            nextBtn: document.getElementById('cube-next-btn'),
+            endScreen: document.getElementById('cube-end-screen'),
+            finalScore: document.getElementById('cube-final-score'),
+            answerKeyContainer: document.getElementById('answer-key-container'),
+            restartBtn: document.getElementById('cube-restart-btn'),
+            endHomeBtn: document.getElementById('cube-end-home-btn'),
+        };
+        
+        const cubeState = {
+            problemSet: [],
+            userAnswers: [],
+            currentProblemIndex: 0,
+            activeMode: 'standard',
+            renderers: [],
+            timer: null,
+            timeLeft: 420, // 7 minutes
+            colors: { part1: '#FFFFFF', part2: '#E53935', choice: '#4CAF50' }
+        };
+
+        function showCubeHomeScreen() {
+            cubeDOM.homeScreen.classList.remove('hidden');
+            cubeDOM.gameUI.classList.add('hidden');
+            cubeDOM.endScreen.classList.add('hidden');
+            clearInterval(cubeState.timer);
+            cubeState.renderers.forEach(r => r.stop());
+        }
+
+        function startCubeGame(mode) {
+            cubeState.activeMode = mode;
+            cubeDOM.homeScreen.classList.add('hidden');
+            cubeDOM.gameUI.classList.remove('hidden');
+            cubeDOM.endScreen.classList.add('hidden');
+            
+            if(mode === 'challenge') cubeDOM.gameUI.classList.add('challenge-mode');
+            else cubeDOM.gameUI.classList.remove('challenge-mode');
+
+            cubeState.currentProblemIndex = 0;
+            generateProblemSet();
+            cubeState.userAnswers = Array(15).fill(null);
+            displayCubeProblem();
+            startCubeTimer();
+        }
+
+        function generateProblemSet() {
+            cubeState.problemSet = [];
+            for (let i = 0; i < 15; i++) {
+                const allPositions = [];
+                for (let x=0; x<3; x++) for (let y=0; y<3; y++) for (let z=0; z<3; z++) allPositions.push({x,y,z});
+                allPositions.sort(() => Math.random() - 0.5);
+                const part1 = allPositions.slice(0, 9);
+                const part2 = allPositions.slice(9, 18);
+                const correctPart = allPositions.slice(18, 27);
+                const distractors = [];
+                while (distractors.length < 3) {
+                    const d = [...allPositions].sort(() => Math.random() - 0.5).slice(0, 9);
+                    if (JSON.stringify(d) !== JSON.stringify(correctPart)) distractors.push(d);
+                }
+                const choices = [correctPart, ...distractors].sort(() => Math.random() - 0.5);
+                const correctChoiceIndex = choices.findIndex(c => JSON.stringify(c) === JSON.stringify(correctPart));
+                cubeState.problemSet.push({ part1, part2, choices, correctChoiceIndex });
+            }
+        }
+
+        function displayCubeProblem() {
+            cubeState.renderers.forEach(r => r.stop());
+            cubeState.renderers = [];
+            
+            const problem = cubeState.problemSet[cubeState.currentProblemIndex];
+            cubeDOM.problemCounter.textContent = `Problem ${cubeState.currentProblemIndex + 1} / 15`;
+            const options = { mode: cubeState.activeMode };
+
+            cubeState.renderers.push(new CanvasRenderer('cube-viewer-part1', problem.part1, cubeState.colors.part1, options));
+            cubeState.renderers.push(new CanvasRenderer('cube-viewer-part2', problem.part2, cubeState.colors.part2, options));
+            
+            cubeDOM.choicesContainer.innerHTML = '';
+            problem.choices.forEach((choice, index) => {
+                const card = document.createElement('div');
+                card.className = 'cube-choice-card bg-gray-800 border-2 border-gray-700 rounded-lg p-2 cursor-pointer';
+                if (cubeState.userAnswers[cubeState.currentProblemIndex] === index) {
+                    card.classList.add('selected-choice');
+                }
+                const canvasId = `cube-choice-viewer-${index}`;
+                card.innerHTML = `<h3 class="text-center font-bold mb-2">Choice ${String.fromCharCode(65 + index)}</h3><canvas id="${canvasId}" class="w-full h-auto aspect-square rounded-md bg-gray-900"></canvas>`;
+                card.addEventListener('click', () => handleCubeChoice(index));
+                cubeDOM.choicesContainer.appendChild(card);
+                cubeState.renderers.push(new CanvasRenderer(canvasId, choice, cubeState.colors.choice, options));
+            });
+            updateNavButtons();
+        }
+
+        function handleCubeChoice(choiceIndex) {
+            cubeState.userAnswers[cubeState.currentProblemIndex] = choiceIndex;
+            Array.from(cubeDOM.choicesContainer.children).forEach((card, index) => {
+                card.classList.toggle('selected-choice', index === choiceIndex);
+            });
+        }
+        
+        function updateNavButtons() {
+            cubeDOM.prevBtn.disabled = cubeState.currentProblemIndex === 0;
+            if (cubeState.currentProblemIndex === 14) {
+                cubeDOM.nextBtn.textContent = 'Submit';
+                cubeDOM.nextBtn.classList.remove('bg-blue-600', 'hover:bg-blue-700');
+                cubeDOM.nextBtn.classList.add('bg-green-600', 'hover:bg-green-700');
+            } else {
+                cubeDOM.nextBtn.textContent = 'Next';
+                cubeDOM.nextBtn.classList.add('bg-blue-600', 'hover:bg-blue-700');
+                cubeDOM.nextBtn.classList.remove('bg-green-600', 'hover:bg-green-700');
+            }
+        }
+        
+        function navigateProblems(direction) {
+            const newIndex = cubeState.currentProblemIndex + direction;
+            if (newIndex >= 0 && newIndex < 15) {
+                cubeState.currentProblemIndex = newIndex;
+                displayCubeProblem();
+            }
+        }
+
+        function startCubeTimer() {
+            clearInterval(cubeState.timer);
+            cubeState.timeLeft = 420;
+            cubeDOM.timer.textContent = formatTime(cubeState.timeLeft);
+            cubeState.timer = setInterval(() => {
+                cubeState.timeLeft--;
+                cubeDOM.timer.textContent = formatTime(cubeState.timeLeft);
+                if (cubeState.timeLeft <= 0) {
+                    endCubeGame();
+                }
+            }, 1000);
+        }
+
+        function endCubeGame() {
+            clearInterval(cubeState.timer);
+            cubeState.renderers.forEach(r => r.stop());
+            cubeState.renderers = [];
+            let score = 0;
+            cubeState.userAnswers.forEach((answer, index) => {
+                if (answer === cubeState.problemSet[index].correctChoiceIndex) {
+                    score++;
+                }
+            });
+            cubeDOM.finalScore.textContent = `${score} / 15`;
+            generateAnswerKey();
+            cubeDOM.gameUI.classList.add('hidden');
+            cubeDOM.endScreen.classList.remove('hidden');
+        }
+
+        function generateAnswerKey() {
+            cubeDOM.answerKeyContainer.innerHTML = '';
+            cubeState.problemSet.forEach((problem, index) => {
+                const userAnswerIndex = cubeState.userAnswers[index];
+                const isCorrect = userAnswerIndex === problem.correctChoiceIndex;
+                const userAnswerLetter = userAnswerIndex !== null ? String.fromCharCode(65 + userAnswerIndex) : 'None';
+                const correctAnswerLetter = String.fromCharCode(65 + problem.correctChoiceIndex);
+
+                const resultDiv = document.createElement('div');
+                resultDiv.className = 'p-3 border-b border-gray-700';
+                resultDiv.innerHTML = `
+                    <div class="flex items-center justify-between">
+                        <p class="font-bold text-lg">Problem ${index + 1}: 
+                            <span class="${isCorrect ? 'text-green-400' : 'text-red-400'}">${isCorrect ? 'Correct' : 'Incorrect'}</span>
+                        </p>
+                        <button data-key-index="${index}" class="show-answer-btn bg-gray-600 hover:bg-gray-500 text-sm py-1 px-3 rounded-md">Show Answer</button>
+                    </div>
+                    <p class="text-sm text-gray-400">You chose: ${userAnswerLetter} | Correct: ${correctAnswerLetter}</p>
+                    <div id="answer-key-viewer-${index}" class="hidden mt-4">
+                        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 p-2 bg-gray-800 rounded-lg">
+                            <div>
+                                <h4 class="text-center font-bold text-xs mb-1">Problem Part 1</h4>
+                                <canvas id="ak-part1-canvas-${index}" class="w-full aspect-square bg-gray-900 rounded-md"></canvas>
+                            </div>
+                            <div>
+                                <h4 class="text-center font-bold text-xs mb-1">Problem Part 2</h4>
+                                <canvas id="ak-part2-canvas-${index}" class="w-full aspect-square bg-gray-900 rounded-md"></canvas>
+                            </div>
+                            <div>
+                                <h4 class="text-center font-bold text-xs mb-1">Solid Assembly</h4>
+                                <canvas id="ak-solid-canvas-${index}" class="w-full aspect-square bg-gray-900 rounded-md"></canvas>
+                            </div>
+                            <div>
+                                <h4 class="text-center font-bold text-xs mb-1">Gapped Assembly</h4>
+                                <canvas id="ak-gapped-canvas-${index}" class="w-full aspect-square bg-gray-900 rounded-md"></canvas>
+                            </div>
+                        </div>
+                         <div class="p-2 bg-gray-800 rounded-lg mt-4">
+                            <h4 class="text-center font-bold text-xs mb-1">2D Layers</h4>
+                            <canvas id="ak-layers-canvas-${index}" class="w-full max-w-sm mx-auto aspect-[2/1] bg-gray-900 rounded-md"></canvas>
+                        </div>
+                    </div>
+                `;
+                cubeDOM.answerKeyContainer.appendChild(resultDiv);
+            });
+
+            document.querySelectorAll('.show-answer-btn').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    const index = e.target.dataset.keyIndex;
+                    const viewer = document.getElementById(`answer-key-viewer-${index}`);
+                    const isHidden = viewer.classList.toggle('hidden');
+                    e.target.textContent = isHidden ? 'Show Answer' : 'Hide Answer';
+
+                    if (!isHidden && !e.target.dataset.rendered) {
+                        const problem = cubeState.problemSet[index];
+                        const correctPart = problem.choices[problem.correctChoiceIndex];
+                        const fullCubeParts = { part1: problem.part1, part2: problem.part2, choice: correctPart };
+                        
+                        const problemOptions = { mode: cubeState.activeMode };
+                        const solutionOptions = { mode: 'standard' }; 
+                        
+                        new CanvasRenderer(`ak-part1-canvas-${index}`, problem.part1, cubeState.colors.part1, problemOptions);
+                        new CanvasRenderer(`ak-part2-canvas-${index}`, problem.part2, cubeState.colors.part2, problemOptions);
+                        new CanvasRenderer(`ak-solid-canvas-${index}`, fullCubeParts, null, { ...solutionOptions, isAssembled: true, isGapped: false });
+                        new CanvasRenderer(`ak-gapped-canvas-${index}`, fullCubeParts, null, { ...solutionOptions, isAssembled: true, isGapped: true });
+                        draw2DLayers(`ak-layers-canvas-${index}`, fullCubeParts, cubeState.colors);
+
+                        e.target.dataset.rendered = 'true';
+                    }
+                });
+            });
+        }
+
+        function draw2DLayers(canvasId, fullCubeParts, colors) {
+            const canvas = document.getElementById(canvasId);
+            if (!canvas) return;
+            canvas.width = 300; canvas.height = 150;
+            const ctx = canvas.getContext('2d');
+            const part1Set = new Set(fullCubeParts.part1.map(p => `${p.x},${p.y},${p.z}`));
+            const part2Set = new Set(fullCubeParts.part2.map(p => `${p.x},${p.y},${p.z}`));
+            const choiceSet = new Set(fullCubeParts.choice.map(p => `${p.x},${p.y},${p.z}`));
+            const gridSpacing = 10; const gridWidth = (canvas.width - gridSpacing * 2) / 3;
+            const cellWidth = gridWidth / 3; const startY = 30;
+            const layerTitles = ["Bottom", "Middle", "Top"];
+            
+            for (let z = 0; z < 3; z++) {
+                const startX = z * (gridWidth + gridSpacing);
+                ctx.fillStyle = '#FFFFFF'; ctx.font = `12px Inter`;
+                ctx.textAlign = 'center';
+                ctx.fillText(layerTitles[z], startX + gridWidth / 2, startY - 10);
+                for (let y = 0; y < 3; y++) {
+                    for (let x = 0; x < 3; x++) {
+                        const coord = `${x},${y},${z}`;
+                        let color = '#374151';
+                        if (part1Set.has(coord)) color = colors.part1;
+                        else if (part2Set.has(coord)) color = colors.part2;
+                        else if (choiceSet.has(coord)) color = colors.choice;
+                        ctx.fillStyle = color;
+                        ctx.fillRect(startX + x * cellWidth, startY + (2 - y) * cellWidth, cellWidth, cellWidth);
+                        ctx.strokeStyle = '#111827'; ctx.lineWidth = 1;
+                        ctx.strokeRect(startX + x * cellWidth, startY + (2 - y) * cellWidth, cellWidth, cellWidth);
+                    }
+                }
+            }
+        }
+        
+        cubeDOM.standardModeBtn.addEventListener('click', () => startCubeGame('standard'));
+        cubeDOM.challengeModeBtn.addEventListener('click', () => startCubeGame('challenge'));
+        cubeDOM.prevBtn.addEventListener('click', () => navigateProblems(-1));
+        cubeDOM.nextBtn.addEventListener('click', () => {
+            if (cubeState.currentProblemIndex === 14) endCubeGame();
+            else navigateProblems(1);
+        });
+        cubeDOM.restartBtn.addEventListener('click', () => startCubeGame(cubeState.activeMode));
+        cubeDOM.endHomeBtn.addEventListener('click', showCubeHomeScreen);
+        cubeDOM.backToHomeBtn.addEventListener('click', showCubeHomeScreen);
+        cubeDOM.backToMenuFromHomeBtn.addEventListener('click', showMainMenu);
+
+        class CanvasRenderer {
+            constructor(canvasId, data, primaryColor, options = {}) {
+                this.canvas = document.getElementById(canvasId);
+                if (!this.canvas) return;
+                this.ctx = this.canvas.getContext('2d');
+                this.options = { mode: 'standard', ...options };
+                this.partsToRender = []; this.animationFrameId = null;
+                this.isDragging = false;
+                this.lastMouseX = 0; this.lastMouseY = 0;
+                this.vertices = [ {x:-0.5,y:-0.5,z:-0.5},{x:0.5,y:-0.5,z:-0.5},{x:0.5,y:0.5,z:-0.5},{x:-0.5,y:0.5,z:-0.5}, {x:-0.5,y:-0.5,z:0.5},{x:0.5,y:-0.5,z:0.5},{x:0.5,y:0.5,z:0.5},{x:-0.5,y:0.5,z:0.5} ];
+                this.faces = [ [0,1,2,3],[1,5,6,2],[5,4,7,6],[4,0,3,7],[3,2,6,7],[4,5,1,0] ];
+                
+                this.angleX = 0.5; this.angleY = -0.5;
+                if(this.options.mode === 'challenge') {
+                    const challengeAngles = [
+                        { x: 0.2, y: -0.3 }, { x: -0.4, y: 0.6 }, { x: 0.6, y: 0.8 },
+                        { x: -0.5, y: -0.5 }, { x: 0.3, y: 0.9 }, { x: 0.7, y: -0.1 }
+                    ];
+                    const randomAngle = challengeAngles[Math.floor(Math.random() * challengeAngles.length)];
+                    this.angleX = randomAngle.x;
+                    this.angleY = randomAngle.y;
+                }
+
+                if (this.options.isAssembled) {
+                    for (const key in data) {
+                        data[key].forEach(pos => this.partsToRender.push({ ...pos, color: cubeState.colors[key] }));
+                    }
+                } else {
+                    data.forEach(pos => this.partsToRender.push({ ...pos, color: primaryColor }));
+                }
+
+                this.setCanvasSize(); this.setupMouseControls();
+                window.addEventListener('resize', () => this.setCanvasSize(), false);
+            }
+            setCanvasSize() {
+                if (!this.canvas.clientWidth) return;
+                this.canvas.width = this.canvas.clientWidth; this.canvas.height = this.canvas.clientHeight;
+                if (this.options.isGapped) this.cubeScale = this.canvas.width * 0.16;
+                else if (this.options.isAssembled) this.cubeScale = this.canvas.width * 0.22;
+                else this.cubeScale = this.canvas.width * 0.2;
+                this.draw();
+            }
+            project(p) {
+                const rY = { x: Math.cos(this.angleY)*p.x + Math.sin(this.angleY)*p.z, y: p.y, z: -Math.sin(this.angleY)*p.x + Math.cos(this.angleY)*p.z };
+                const rXY = { x: rY.x, y: Math.cos(this.angleX)*rY.y - Math.sin(this.angleX)*rY.z, z: Math.sin(this.angleX)*rY.y + Math.cos(this.angleX)*rY.z };
+                return { x: rXY.x * this.cubeScale, y: rXY.y * this.cubeScale, z: rXY.z };
+            }
+            draw() {
+                if (!this.ctx) return; this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+                this.ctx.save(); this.ctx.translate(this.canvas.width / 2, this.canvas.height / 2);
+                const allFaces = [];
+                const gap = this.options.isGapped ? 1.6 : (this.options.isAssembled ? 1.0 : 1.2);
+
+                this.partsToRender.forEach(part => {
+                    const offset = {x:(part.x-1)*gap, y:(part.y-1)*gap, z:(part.z-1)*gap};
+                    const pVerts = this.vertices.map(v => this.project({x:v.x+offset.x, y:v.y+offset.y, z:v.z+offset.z}));
+                    this.faces.forEach(f => {
+                        const fPoints = f.map(i => pVerts[i]);
+                        allFaces.push({ points: fPoints, z: fPoints.reduce((s,p)=>s+p.z,0)/4, color: part.color });
+                    });
+                });
+
+                allFaces.sort((a, b) => a.z - b.z);
+                allFaces.forEach(face => {
+                    this.ctx.beginPath(); this.ctx.moveTo(face.points[0].x, face.points[0].y);
+                    for (let i=1; i<face.points.length; i++) this.ctx.lineTo(face.points[i].x, face.points[i].y);
+                    this.ctx.closePath(); this.ctx.fillStyle=face.color; this.ctx.strokeStyle='#111827';
+                    this.ctx.lineWidth=2; this.ctx.fill(); this.ctx.stroke();
+                });
+                this.ctx.restore();
+            }
+            stop() { if (this.animationFrameId) cancelAnimationFrame(this.animationFrameId); }
+            setupMouseControls() {
+                if (this.options.mode === 'challenge') {
+                    this.canvas.style.cursor = 'default';
+                    return;
+                }
+                const start = (x, y) => { this.isDragging = true; this.lastMouseX = x; this.lastMouseY = y; };
+                const drag = (x, y) => { if (this.isDragging) {
+                    this.angleY += (x - this.lastMouseX) * 0.01; this.angleX += (y - this.lastMouseY) * 0.01;
+                    this.lastMouseX = x; this.lastMouseY = y; this.draw();
+                }};
+                const end = () => { this.isDragging = false; };
+                this.canvas.addEventListener('mousedown', e => start(e.clientX, e.clientY));
+                this.canvas.addEventListener('mousemove', e => drag(e.clientX, e.clientY));
+                this.canvas.addEventListener('mouseup', end); this.canvas.addEventListener('mouseleave', end);
+                this.canvas.addEventListener('touchstart', e=>{e.preventDefault();start(e.touches[0].clientX,e.touches[0].clientY);});
+                this.canvas.addEventListener('touchmove', e=>{e.preventDefault();drag(e.touches[0].clientX,e.touches[0].clientY);});
+                this.canvas.addEventListener('touchend', e=>{e.preventDefault();end();});
+            }
+        }
+        
         // --- App Initialization ---
         window.onload = () => {
             initMap();
             
+            // Dummy Firebase config for offline development.
+            // Replace with your actual config if deploying.
             const firebaseConfig = {
                   apiKey: "AIzaSyD4v0iN7y1C9GEDYhgyxv2koaJCUxjtnqg",
                   authDomain: "airport-qui.firebaseapp.com",
@@ -671,17 +1107,17 @@
                   messagingSenderId: "66527997631",
                   appId: "1:66527997631:web:942a882fb564ac8e78600a",
                   measurementId: "G-J8QFJLJWMP"
-                };
+            };
 
             if (!firebaseConfig || !firebaseConfig.projectId || firebaseConfig.apiKey === "YOUR_API_KEY") {
-                 console.warn("Using offline mode. Progress will not be saved.");
-                 loadingScreen.classList.add('hidden');
-                 showMainMenu();
-                 isInitialLoad = false;
-                 userIdDisplay.textContent = 'offline-user';
-                 airwaysDestinations.forEach(dest => { airportState.destinationProgress[dest.city] = 0; });
-                 updateProgressSummary();
-                 return;
+                console.warn("Using offline mode. Progress will not be saved.");
+                loadingScreen.classList.add('hidden');
+                showMainMenu();
+                isInitialLoad = false;
+                userIdDisplay.textContent = 'offline-user';
+                airwaysDestinations.forEach(dest => { airportState.destinationProgress[dest.city] = 0; });
+                updateProgressSummary();
+                return;
             }
             
             app = initializeApp(firebaseConfig);
@@ -707,8 +1143,8 @@
             });
 
             confirmNoButton.addEventListener('click', () => {
-                 confirmModal.classList.add('hidden');
-                 onConfirmAction = null;
+                confirmModal.classList.add('hidden');
+                onConfirmAction = null;
             });
             confirmYesButton.addEventListener('click', () => {
                 if (onConfirmAction) onConfirmAction();
